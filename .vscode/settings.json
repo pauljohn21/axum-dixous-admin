@@ -1,0 +1,16 @@
+{
+  "rust-analyzer.checkOnSave.command": "clippy",
+  "rust-analyzer.cargo.loadOutDirsFromCheck": true,
+  "rust-analyzer.procMacro.enable": true,
+  "rust-analyzer.rustfmt.overrideCommand": null,
+  "lldb.launch.sourceLanguages": ["rust"],
+  "lldb.adapterType": "native",
+  "files.associations": {
+    "*.rs": "rust"
+  },
+  "rust-analyzer.linkedProjects": [
+    "backend/server/Cargo.toml",
+    "web/Cargo.toml",
+  ],
+  "rust-analyzer.cargo.features": "all"
+}

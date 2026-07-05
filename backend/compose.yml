@@ -1,0 +1,56 @@
+services:
+  mysql:
+    image: mysql
+    platform: linux/arm64 # 确保使用 arm64 架构
+    restart: always
+    container_name: mysql
+    ports:
+      - "3306:3306"
+    environment:
+      MYSQL_ROOT_PASSWORD: root123456
+      MYSQL_DATABASE: scm
+    command: 
+      --character-set-server=utf8mb4
+      --collation-server=utf8mb4_general_ci
+      --explicit_defaults_for_timestamp=true
+      --lower_case_table_names=1
+      --max_allowed_packet=128M
+      --optimizer-trace-max-mem-size=102400
+    volumes:
+      - ./data/mysql:/var/lib/mysql
+  # postgres:
+  #   image: postgres
+  #   platform: linux/arm64 # 确保使用 arm64 架构
+  #   restart: always
+  #   container_name: pg
+  #   ports:
+  #     - "5432:5432"
+  #   environment:
+  #     POSTGRES_PASSWORD: root123456
+  #     POSTGRES_DB: scm
+  #   volumes:
+  #     - ./data/postgres:/var/lib/postgresql/data
+
+  redis:
+    image: redis:7-alpine3.18 # 使用带有 arm64 支持的最新版本
+    platform: linux/arm64 # 确保使用 arm64 架构
+    restart: always
+    container_name: redis
+    ports:
+      - "6379:6379"
+    deploy:
+      resources:
+        limits:
+          cpus: "0.5" # 根据需要调整 CPU 限制
+          memory: 256M # 根据需要调整内存限制
+    command: ["redis-server", "--appendonly", "yes"] # 启用 AOF 持久化
+    volumes:
+      - ./data/redis:/data # 持久化存储路径
+
+  db_manager:
+    image: adminer
+    platform: linux/arm64 # 确保使用 arm64 架构
+    restart: always
+    container_name: db_manager
+    ports:
+      - "8090:8080"

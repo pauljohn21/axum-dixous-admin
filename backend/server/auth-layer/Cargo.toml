@@ -1,0 +1,14 @@
+[package]
+name = "auth-layer"
+version.workspace = true
+edition.workspace = true
+
+[dependencies]
+axum = { workspace = true }
+casbin = { workspace = true }
+futures = { workspace = true }
+http = { workspace = true }
+tokio = { workspace = true, features = ["sync"] }
+tower = { workspace = true }
+utils = { workspace = true }
+tracing = { workspace = true }

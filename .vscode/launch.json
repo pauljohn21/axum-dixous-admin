@@ -1,0 +1,76 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "type": "lldb",
+      "request": "launch",
+      "name": "Debug Backend Server",
+      "cargo": {
+        "cargoPath": "cargo",
+        "program": "server/target/debug/axum-dixous-admin-server",
+        "args": []
+      },
+      "args": [],
+      "cwd": "${workspaceFolder}/backend/server",
+      "env": {
+        "RUST_BACKTRACE": "1",
+        "RUST_LOG": "debug"
+      },
+      "terminal": "integrated"
+    },
+    {
+      "type": "lldb",
+      "request": "launch",
+      "name": "Debug Web Application",
+      "cargo": {
+        "cargoPath": "cargo",
+        "program": "web/target/debug/web",
+        "args": []
+      },
+      "args": [],
+      "cwd": "${workspaceFolder}/web",
+      "env": {
+        "RUST_BACKTRACE": "1"
+      },
+      "terminal": "integrated"
+    },
+    {
+      "type": "lldb",
+      "request": "launch",
+      "name": "Debug Web-Antd Application",
+      "cargo": {
+        "cargoPath": "cargo",
+        "program": "web-antd/target/debug/web-antd",
+        "args": []
+      },
+      "args": [],
+      "cwd": "${workspaceFolder}/web-antd",
+      "env": {
+        "RUST_BACKTRACE": "1"
+      },
+      "terminal": "integrated"
+    },
+    {
+      "type": "lldb",
+      "request": "launch",
+      "name": "Debug Dioxus Ant Icons",
+      "cargo": {
+        "cargoPath": "cargo",
+        "program": "dioxus-ant-icons/target/debug/lib",
+        "args": []
+      },
+      "args": [],
+      "cwd": "${workspaceFolder}/dioxus-ant-icons",
+      "env": {
+        "RUST_BACKTRACE": "1"
+      },
+      "terminal": "integrated"
+    },
+    {
+      "type": "lldb",
+      "request": "attach",
+      "name": "Attach to Process",
+      "program": "${workspaceFolder}"
+    }
+  ]
+}

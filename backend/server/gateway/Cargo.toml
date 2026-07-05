@@ -1,0 +1,28 @@
+[package]
+name = "gateway"
+version.workspace = true
+edition.workspace = true
+
+[dependencies]
+axum = { workspace = true }
+utils = { workspace = true }
+tokio = { workspace = true, features = ["full"] }
+migration = { workspace = true }
+tracing = { workspace = true }
+model = { workspace = true }
+sea-orm = { workspace = true }
+# casbin
+casbin = { workspace = true }
+casbin-adapter = { workspace = true }
+auth-layer = { workspace = true }
+# tower middleware
+tower-http = { workspace = true }
+# service & api
+service = { path = "../service" }
+api = { path = "../api" }
+# serde
+serde = { workspace = true, features = ["derive"] }
+serde_json = { workspace = true }
+# openapi
+utoipa = { workspace = true }
+utoipa-swagger-ui = { workspace = true }

@@ -1,0 +1,18 @@
+[package]
+name = "api"
+version = "0.1.0"
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+utoipa = { workspace = true }
+utoipa-swagger-ui = { workspace = true }
+serde = { workspace = true, features = ["derive"] }
+serde_json = { workspace = true }
+axum = { workspace = true }
+model = { path = "../data/model" }
+service = { path = "../service" }
+utils = { path = "../utils" }
+anyhow = { workspace = true }
+auth-layer = { path = "../auth-layer" }

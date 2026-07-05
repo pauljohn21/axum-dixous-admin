@@ -1,0 +1,46 @@
+[package]
+name = "utils"
+version.workspace = true
+edition.workspace = true
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+#序列化
+serde = { workspace = true, features = ["derive"] }
+serde_yaml = { workspace = true }
+serde_json = { workspace = true }
+#日志
+tracing = { workspace = true, features = ["log"] }
+tracing-subscriber = { workspace = true }
+log = { workspace = true }
+#工具
+once_cell = { workspace = true }
+rand = { workspace = true }
+bytes = { workspace = true }
+# jwt
+jsonwebtoken = { workspace = true }
+chrono = { workspace = true }
+# 加密
+md5 = { workspace = true }
+argon2 = { workspace = true }
+sha2 = { workspace = true }
+hmac = { workspace = true }
+password-auth = { workspace = true }
+#orm
+sea-orm = { workspace = true, features = [
+    "sqlx-mysql",
+    "sqlx-postgres",
+    "runtime-tokio-rustls",
+] }
+#错误
+thiserror = { workspace = true }
+anyhow = { workspace = true }
+#web
+axum = { workspace = true }
+mime = { workspace = true }
+
+utoipa = { workspace = true }
+
+[dev-dependencies]
+tokio = { workspace = true, features = ["full"] }

@@ -1,0 +1,17 @@
+pub use super::casbin_rule::Entity as CasbinRule;
+pub use super::jwt_blacklists::Entity as JwtBlacklists;
+pub use super::sys_apis::Entity as SysApis;
+pub use super::sys_base_menu_btns::Entity as SysBaseMenuBtns;
+pub use super::sys_base_menu_parameters::Entity as SysBaseMenuParameters;
+pub use super::sys_data_role_id::Entity as SysDataRoleId;
+pub use super::sys_dictionary_details::Entity as SysDictionaryDetails;
+pub use super::sys_dictionaries::Entity as SysDictionaries;
+pub use super::sys_menu::Entity as SysMenu;
+pub use super::sys_menu_domain::Entity as SysMenuDomain;
+pub use super::sys_menu_role::Entity as SysMenuRole;
+pub use super::sys_operation_records::Entity as SysOperationRecords;
+pub use super::sys_role::Entity as SysRole;
+pub use super::sys_role_btns::Entity as SysRoleBtns;
+pub use super::sys_role_menus::Entity as SysRoleMenus;
+pub use super::sys_user::Entity as SysUser;
+pub use super::sys_user_role::Entity as SysUserRole;

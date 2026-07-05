@@ -1,0 +1,22 @@
+[package]
+name = "migration"
+version.workspace = true
+edition.workspace = true
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+
+async-std = { workspace = true, features = ["attributes", "tokio1"] }
+utils = { workspace = true }
+tracing = { workspace = true }
+chrono = "0.4.38"
+uuid = { workspace = true, features = ["v4"] }
+[dependencies.sea-orm-migration]
+workspace = true
+features = [
+    "runtime-tokio-rustls",
+    "sqlx-postgres",
+    "sqlx-mysql",
+    "with-uuid"
+]

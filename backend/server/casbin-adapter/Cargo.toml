@@ -1,0 +1,9 @@
+[package]
+name = "casbin-adapter"
+version.workspace = true
+edition.workspace = true
+
+[dependencies]
+async-trait = { workspace = true }
+casbin = { workspace = true }
+sea-orm = { workspace = true, features = ["macros"] }

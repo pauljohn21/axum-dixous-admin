@@ -1,0 +1,11 @@
+#root
+.idea
+.DS_Store
+.vscode
+#server
+server/Cargo.lock
+server/target
+#web
+web/node_modules
+web/pnpm-lock.yaml
+web/.vscode

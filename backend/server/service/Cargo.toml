@@ -1,0 +1,15 @@
+[package]
+name = "service"
+version.workspace = true
+edition.workspace = true
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+sea-orm = { workspace = true }
+model = { workspace = true }
+utils = { workspace = true }
+anyhow = { workspace = true }
+serde = { workspace = true }
+[dev-dependencies]
+tokio = { workspace = true, features = ["full"] }

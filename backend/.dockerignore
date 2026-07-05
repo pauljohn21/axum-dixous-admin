@@ -1,0 +1,4 @@
+.idea
+server/Cargo.lock
+server/target
+.vscode
