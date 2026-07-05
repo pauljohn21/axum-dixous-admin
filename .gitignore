@@ -1,0 +1,45 @@
+**/*.rs.bk
+
+# 编译输出
+**/target
+**/Cargo.lock
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# 系统
+.DS_Store
+Thumbs.db
+
+# Node.js
+**/node_modules
+**/dist
+
+# Dioxus
+**/.dioxus
+
+# Database
+data/mysql/
+data/redis/
+
+# Logs
+logs/
+*.log
+
+# 临时文件
+**/*.tmp
+**/*.bak
+**/fix_line_clean.py
+
+# 环境变量
+.env
+.env.local
+
+# SeaORM迁移备份
+**/*bak*
+
+# 文档外的临时文档
+.traefik.yml
