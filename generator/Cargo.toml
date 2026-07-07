@@ -1,7 +1,8 @@
 [package]
 name = "axum-admin-generator"
 version = "0.1.0"
-edition = "2021"
+edition = "2024"
+rust-version = "1.96"
 description = "全栈 CRUD 代码生成器 — axum-dixous-admin 专用"
 
 [dependencies]

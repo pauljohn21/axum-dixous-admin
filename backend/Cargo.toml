@@ -5,7 +5,8 @@ resolver = "2"
 
 [workspace.package]
 version = "0.1.0"
-edition = "2021"
+edition = "2024"
+rust-version = "1.96"
 
 # See more keys and their dependencies at https://doc.rust-lang.org/cargo/reference/manifest.html
 
@@ -71,7 +72,8 @@ casbin-adapter = { path = "server/casbin-adapter" }
 [package]
 name = "backend"
 version = "0.1.0"
-edition = "2021"
+edition = "2024"
+rust-version = "1.96"
 
 [[bin]]
 name = "backend"
