@@ -1,5 +1,7 @@
 use anyhow::{anyhow, Result};
 use sea_orm::{ActiveModelTrait, ColumnTrait, EntityTrait, PaginatorTrait, QueryFilter, QuerySelect, Set, TransactionTrait};
+use serde::Deserialize;
+use tracing::error;
 
 use model::dao::sys_user;
 use model::dao::sys_user::ActiveModel;
@@ -8,7 +10,7 @@ use model::dto::sys_user_dto::{LoginDTO, SysUserInsertDTO, SysUserUpdateDTO};
 use model::dto::sys_user_role::SysUserRoleAddDto;
 use model::prelude::SysUser;
 use utils::db_conn;
-use utils::prelude::PasswordUtils;
+use utils::prelude::{CONFIG, PasswordUtils};
 
 use crate::sys_user_role_service::SysUserRoleService;
 
@@ -145,6 +147,110 @@ impl SysUserService {
         SysUser::delete_by_id(id).exec(&txn).await?;
         txn.commit().await?;
         Ok(())
+    }
+
+    /// 微信登录 — 通过 wx.login 的 code 换取 openid，查找或自动注册用户
+    pub async fn wx_login(code: &str) -> Result<sys_user::Model> {
+        // 1. 调用微信 code2Session 接口获取 openid
+        let openid = Self::code2session(code).await?;
+
+        // 2. 根据 openid 查找用户
+        let db = db_conn!();
+        if let Some(user) = SysUser::find()
+            .filter(sys_user::Column::WxOpenid.eq(&openid))
+            .one(db)
+            .await?
+        {
+            // 已绑定过微信，直接返回
+            return Ok(user);
+        }
+
+        // 3. 未绑定 — 自动注册新用户
+        let username = format!("wx_{}", &openid[..openid.len().min(10)]);
+        let random_password = utils::prelude::rand_utils(16);
+        let hash = PasswordUtils::encrypt(&random_password);
+
+        let new_user = ActiveModel {
+            username: Set(Some(username)),
+            password: Set(Some(hash.password_hash)),
+            salt: Set(Some(hash.salt)),
+            wx_openid: Set(Some(openid)),
+            nick_name: Set(Some("微信用户".to_string())),
+            enable: Set(Some(1)),
+            ..Default::default()
+        };
+
+        let saved = SysUser::insert(new_user).exec(db).await?;
+        SysUser::find_by_id(saved.last_insert_id)
+            .one(db)
+            .await?
+            .ok_or_else(|| anyhow!("微信用户注册失败"))
+    }
+
+    /// 微信绑定 — 将当前登录用户绑定到微信 openid
+    /// 如果该 openid 已被其他用户绑定，则返回错误
+    pub async fn wx_bind(username: &str, code: &str) -> Result<()> {
+        let openid = Self::code2session(code).await?;
+        let db = db_conn!();
+
+        // 检查 openid 是否已被其他用户绑定
+        if let Some(existing) = SysUser::find()
+            .filter(sys_user::Column::WxOpenid.eq(&openid))
+            .one(db)
+            .await?
+        {
+            if existing.username.as_deref() != Some(username) {
+                return Err(anyhow!("该微信号已绑定其他账号"));
+            }
+            // 已经绑定的是当前用户，无需重复操作
+            return Ok(());
+        }
+
+        // 查找当前用户并绑定 openid
+        let user = SysUser::find()
+            .filter(sys_user::Column::Username.eq(username))
+            .one(db)
+            .await?
+            .ok_or_else(|| anyhow!("用户不存在"))?;
+
+        let mut active: ActiveModel = user.into();
+        active.wx_openid = Set(Some(openid));
+        active.update(db).await?;
+        Ok(())
+    }
+
+    /// 调用微信 code2Session 接口 — 用 code 换取 openid + session_key
+    async fn code2session(code: &str) -> Result<String> {
+        /// 微信 code2Session 响应体
+        #[derive(Deserialize)]
+        struct WxSessionResp {
+            openid: Option<String>,
+            #[serde(default)]
+            errcode: i32,
+            #[serde(default)]
+            errmsg: String,
+        }
+
+        let url = format!(
+            "https://api.weixin.qq.com/sns/jscode2session?appid={}&secret={}&js_code={}&grant_type=authorization_code",
+            CONFIG.wechat.appid,
+            CONFIG.wechat.secret,
+            code
+        );
+
+        let resp: WxSessionResp = reqwest::get(&url)
+            .await
+            .map_err(|e| anyhow!("请求微信接口失败: {}", e))?
+            .json()
+            .await
+            .map_err(|e| anyhow!("解析微信响应失败: {}", e))?;
+
+        if resp.errcode != 0 {
+            error!("微信 code2Session 错误: {} - {}", resp.errcode, resp.errmsg);
+            return Err(anyhow!("微信登录失败: {}", resp.errmsg));
+        }
+
+        resp.openid.ok_or_else(|| anyhow!("微信返回 openid 为空"))
     }
 
     /// 仪表盘统计数据

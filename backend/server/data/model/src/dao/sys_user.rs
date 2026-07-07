@@ -19,6 +19,7 @@ pub struct Model {
     pub phone: Option<String>,
     pub email: Option<String>,
     pub enable: Option<u64>,
+    pub wx_openid: Option<String>,
     pub created_at: Option<String>,
     pub updated_at: Option<String>,
     pub deleted_at: Option<String>,

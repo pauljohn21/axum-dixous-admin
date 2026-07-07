@@ -1,0 +1,107 @@
+/**app.wxss**/
+page {
+  background-color: #f0f2f5;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+  font-size: 28rpx;
+  color: #303133;
+}
+
+/* 卡片 */
+.card {
+  background: #ffffff;
+  border-radius: 12rpx;
+  padding: 32rpx;
+  margin: 24rpx;
+  box-shadow: 0 2rpx 12rpx rgba(0, 0, 0, 0.08);
+}
+
+/* 统计卡片 */
+.stat-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 40rpx 24rpx;
+}
+
+.stat-value {
+  font-size: 56rpx;
+  font-weight: 700;
+  color: #409eff;
+  margin-bottom: 12rpx;
+}
+
+.stat-label {
+  font-size: 24rpx;
+  color: #909399;
+}
+
+/* 按钮 */
+.btn-primary {
+  background: #409eff;
+  color: #ffffff;
+  border: none;
+  border-radius: 8rpx;
+  padding: 20rpx 0;
+  font-size: 32rpx;
+  text-align: center;
+  width: 100%;
+}
+
+.btn-primary[disabled] {
+  background: #a0cfff;
+  color: #f4f4f5;
+}
+
+/* 输入框 */
+.input-field {
+  background: #f5f7fa;
+  border: 1rpx solid #e4e7ed;
+  border-radius: 8rpx;
+  padding: 20rpx 24rpx;
+  font-size: 28rpx;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+/* 列表项 */
+.list-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 24rpx 32rpx;
+  border-bottom: 1rpx solid #ebeef5;
+}
+
+.list-item:last-child {
+  border-bottom: none;
+}
+
+/* 标签 */
+.tag {
+  display: inline-block;
+  padding: 4rpx 16rpx;
+  border-radius: 4rpx;
+  font-size: 24rpx;
+}
+
+.tag-success {
+  background: #f0f9eb;
+  color: #67c23a;
+}
+
+.tag-danger {
+  background: #fef0f0;
+  color: #f56c6c;
+}
+
+/* 文本工具类 */
+.text-secondary {
+  color: #909399;
+  font-size: 24rpx;
+}
+
+.text-primary {
+  color: #303133;
+  font-size: 28rpx;
+}

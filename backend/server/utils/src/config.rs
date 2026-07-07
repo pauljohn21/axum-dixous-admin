@@ -14,6 +14,8 @@ pub struct Config {
     pub cache: Cache,
     pub logger: Logger,
     pub jwt: JwtConfig,
+    #[serde(default)]
+    pub wechat: WechatConfig,
 }
 
 impl Default for Config {
@@ -73,6 +75,12 @@ impl Server {
 pub struct JwtConfig {
     pub secret: String,
     pub expire_hours: i64,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+pub struct WechatConfig {
+    pub appid: String,
+    pub secret: String,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

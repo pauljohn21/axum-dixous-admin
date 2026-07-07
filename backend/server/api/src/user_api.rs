@@ -26,6 +26,7 @@ pub struct UserInfoResp {
     pub phone: Option<String>,
     pub email: Option<String>,
     pub header_img: Option<String>,
+    pub wx_openid: Option<String>,
     pub menus: Vec<sys_menu::Model>,
 }
 
@@ -34,6 +35,18 @@ pub struct UserInfoResp {
 pub struct ChangePasswordDTO {
     pub old_password: String,
     pub new_password: String,
+}
+
+/// 微信登录请求
+#[derive(Deserialize, Serialize, ToSchema)]
+pub struct WxLoginDTO {
+    pub code: String,
+}
+
+/// 微信绑定请求
+#[derive(Deserialize, Serialize, ToSchema)]
+pub struct WxBindDTO {
+    pub code: String,
 }
 
 #[utoipa::path(
@@ -46,6 +59,23 @@ pub struct ChangePasswordDTO {
 pub async fn login(Json(data): Json<LoginDTO>) -> Result<impl IntoResponse, AppError> {
     let user = SysUserService::login(data).await.map_err(|e| AppError::AuthError(e.to_string()))?;
     let token = create_token(&user.username.clone().unwrap_or_default()).map_err(|e| AppError::AuthError(e.to_string()))?;
+    Ok(R::ok(LoginResp { token }))
+}
+
+/// 微信小程序登录 — 通过 wx.login 返回的 code 换取 openid，自动注册/登录
+#[utoipa::path(
+    post,
+    path = "/api/user/wx-login",
+    request_body = WxLoginDTO,
+    responses((status = 200, description = "成功", body = R<LoginResp>)),
+    tag = "用户管理"
+)]
+pub async fn wx_login(Json(data): Json<WxLoginDTO>) -> Result<impl IntoResponse, AppError> {
+    let user = SysUserService::wx_login(&data.code)
+        .await
+        .map_err(|e| AppError::AuthError(e.to_string()))?;
+    let token = create_token(&user.username.clone().unwrap_or_default())
+        .map_err(|e| AppError::AuthError(e.to_string()))?;
     Ok(R::ok(LoginResp { token }))
 }
 
@@ -150,8 +180,27 @@ pub async fn get_user_info(Extension(username): Extension<Username>) -> Result<i
         phone: user.phone,
         email: user.email,
         header_img: user.header_img,
+        wx_openid: user.wx_openid,
         menus,
     }))
+}
+
+/// 绑定微信号 — 将当前登录用户绑定到微信 openid
+#[utoipa::path(
+    post,
+    path = "/api/user/bind-wechat",
+    request_body = WxBindDTO,
+    responses((status = 200, description = "成功", body = R<serde_json::Value>)),
+    tag = "用户管理"
+)]
+pub async fn bind_wechat(
+    Extension(username): Extension<Username>,
+    Json(data): Json<WxBindDTO>,
+) -> Result<impl IntoResponse, AppError> {
+    SysUserService::wx_bind(&username.0, &data.code)
+        .await
+        .map_err(|e| AppError::AuthError(e.to_string()))?;
+    Ok(R::ok(()))
 }
 
 /// 修改密码
@@ -191,6 +240,7 @@ pub fn routes() -> Router {
         .route("/api/user/logout", post(logout))
         .route("/api/user/info", get(get_user_info))
         .route("/api/user/change_password", axum::routing::put(change_password))
+        .route("/api/user/bind-wechat", post(bind_wechat))
         .route("/api/user/{id}", get(get_by_id).put(update).delete(delete_user))
         .route("/api/dashboard/stats", get(dashboard_stats))
 }

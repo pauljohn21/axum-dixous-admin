@@ -1,0 +1,148 @@
+/* pages/profile/profile.wxss */
+.profile-page {
+  min-height: 100vh;
+  padding-bottom: 40rpx;
+}
+
+.user-card {
+  display: flex;
+  align-items: center;
+  padding: 48rpx 32rpx;
+  background: linear-gradient(135deg, #409eff, #667eea);
+  color: #ffffff;
+}
+
+.avatar-circle {
+  width: 120rpx;
+  height: 120rpx;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.25);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 56rpx;
+  font-weight: 700;
+  flex-shrink: 0;
+}
+
+.user-meta {
+  margin-left: 32rpx;
+  display: flex;
+  flex-direction: column;
+  gap: 8rpx;
+}
+
+.user-name {
+  font-size: 40rpx;
+  font-weight: 600;
+}
+
+.user-nick {
+  font-size: 26rpx;
+  opacity: 0.8;
+}
+
+.card {
+  margin: 24rpx 32rpx;
+  background: #ffffff;
+  border-radius: 16rpx;
+  padding: 32rpx;
+  box-shadow: 0 2rpx 12rpx rgba(0, 0, 0, 0.04);
+}
+
+.card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 32rpx;
+  font-weight: 600;
+  color: #303133;
+  margin-bottom: 24rpx;
+  padding-bottom: 16rpx;
+  border-bottom: 1rpx solid #ebeef5;
+}
+
+.arrow {
+  font-size: 24rpx;
+  color: #909399;
+}
+
+.info-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 20rpx 0;
+  border-bottom: 1rpx solid #f2f6fc;
+}
+
+.info-row:last-child {
+  border-bottom: none;
+}
+
+.info-label {
+  font-size: 28rpx;
+  color: #909399;
+}
+
+.info-value {
+  font-size: 28rpx;
+  color: #303133;
+}
+
+.text-success {
+  color: #67c23a !important;
+}
+
+.text-warning {
+  color: #e6a23c !important;
+}
+
+.password-form {
+  display: flex;
+  flex-direction: column;
+  gap: 24rpx;
+}
+
+.input-field {
+  border: 2rpx solid #dcdfe6;
+  border-radius: 8rpx;
+  padding: 20rpx 24rpx;
+  font-size: 28rpx;
+  color: #303133;
+  background: #fff;
+}
+
+.btn-primary {
+  background: #409eff !important;
+  color: #ffffff !important;
+  border: none !important;
+  border-radius: 8rpx !important;
+  font-size: 30rpx !important;
+}
+
+/* 微信绑定按钮 */
+.btn-wx-bind {
+  margin-top: 24rpx;
+  background: #07c160 !important;
+  color: #ffffff !important;
+  border: none !important;
+  border-radius: 8rpx !important;
+  font-size: 30rpx !important;
+}
+
+.btn-wx-bind[disabled] {
+  opacity: 0.6;
+}
+
+.btn-wx-rebind {
+  background: #909399 !important;
+}
+
+.btn-logout {
+  background: #f56c6c !important;
+  color: #ffffff !important;
+  border: none !important;
+  border-radius: 8rpx !important;
+  font-size: 32rpx !important;
+  width: 100% !important;
+}

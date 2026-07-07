@@ -29,6 +29,7 @@ impl MigrationTrait for Migration {
                     .col(string_null(SysUser::Phone).comment("手机号"))
                     .col(string_null(SysUser::Email).comment("邮箱"))
                     .col(big_unsigned(SysUser::Enable).default("1").comment("用户是否被冻结 1正常 2冻结"))
+                    .col(string_len_null(SysUser::WxOpenid, 64).comment("微信 openid"))
                     .col(string_null(SysUser::CreatedAt).comment("创建者"))
                     .col(string_null(SysUser::UpdatedAt).comment("修改者"))
                     .col(string_null(SysUser::DeletedAt).comment("删除者"))
@@ -36,6 +37,7 @@ impl MigrationTrait for Migration {
                     .col(timestamp_with_time_zone(SysUser::UpdatedAd).default(CurrentTimestamp).comment("修改时间"))
                     .col(timestamp_with_time_zone_null(SysUser::DeletedAd).comment("删除时间"))
                     .index(Index::create().unique().name("idx_sys_user_username").col(SysUser::Username))
+                    .index(Index::create().unique().name("idx_sys_user_wx_openid").col(SysUser::WxOpenid))
                     .comment("系统用户表")
                     .to_owned(),
             )
@@ -95,4 +97,5 @@ pub enum SysUser {
     CreatedAd,
     UpdatedAd,
     DeletedAd,
+    WxOpenid,
 }

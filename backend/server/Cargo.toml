@@ -61,6 +61,8 @@ password-auth = "1.0.0"
 
 # jwt
 jsonwebtoken = "9.1.0"
+# HTTP 客户端 (微信 API 调用)
+reqwest = { version = "0.12", default-features = false, features = ["rustls-tls", "json"] }
 #内部模块
 utils = { path = "utils" }
 model = { path = "data/model" }

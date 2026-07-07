@@ -31,8 +31,8 @@ use utils::prelude::R;
         description = "后台管理系统 API"
     ),
     paths(
-        user_api::login, user_api::register, user_api::logout, user_api::list, user_api::get_by_id, user_api::update, user_api::delete_user,
-        user_api::get_user_info, user_api::change_password, user_api::dashboard_stats,
+        user_api::login, user_api::wx_login, user_api::register, user_api::logout, user_api::list, user_api::get_by_id, user_api::update, user_api::delete_user,
+        user_api::get_user_info, user_api::change_password, user_api::dashboard_stats, user_api::bind_wechat,
         role_api::create, role_api::list, role_api::get_by_id, role_api::update, role_api::delete_role,
         menu_api::create, menu_api::list, menu_api::get_by_id, menu_api::update, menu_api::delete_menu,
         api_api::create, api_api::list, api_api::get_by_id, api_api::update, api_api::delete_api,
@@ -53,6 +53,8 @@ use utils::prelude::R;
         page_dto::PageRequest,
         page_dto::PageResponse<serde_json::Value>,
         sys_user_dto::LoginDTO, sys_user_dto::SysUserInsertDTO, sys_user_dto::SysUserUpdateDTO, sys_user_dto::SysUserQueryDTO,
+        user_api::WxLoginDTO,
+        user_api::WxBindDTO,
         sys_role_dto::SysRoleInsertDTO, sys_role_dto::SysRoleUpdateDTO, sys_role_dto::SysRoleQueryDTO,
         sys_menu_dto::SysMenuInsertDTO, sys_menu_dto::SysMenuUpdateDTO, sys_menu_dto::SysMenuQueryDTO,
         sys_api_dto::SysApiInsertDTO, sys_api_dto::SysApiUpdateDTO, sys_api_dto::SysApiQueryDTO,
@@ -112,6 +114,7 @@ impl Modify for SecurityAddon {
 pub fn public_routes() -> Router {
     Router::new()
         .route("/api/user/login", post(user_api::login))
+        .route("/api/user/wx-login", post(user_api::wx_login))
         .route("/health", axum::routing::get(health))
 }
 

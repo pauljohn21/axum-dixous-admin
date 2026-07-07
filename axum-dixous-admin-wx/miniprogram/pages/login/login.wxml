@@ -1,0 +1,67 @@
+<!--pages/login/login.wxml-->
+<view class="login-page">
+  <!-- Logo 区域 -->
+  <view class="logo-area">
+    <text class="logo-title">Axum Admin</text>
+    <text class="logo-subtitle">后台管理系统</text>
+  </view>
+
+  <!-- 表单区域 -->
+  <view class="form-area">
+    <!-- 错误提示 -->
+    <view wx:if="{{errorMsg}}" class="error-box">
+      <text>{{errorMsg}}</text>
+    </view>
+
+    <!-- 用户名 -->
+    <view class="form-item">
+      <text class="form-label">用户名</text>
+      <input
+        class="input-field"
+        placeholder="请输入用户名"
+        value="{{username}}"
+        bindinput="onUsernameInput"
+      />
+    </view>
+
+    <!-- 密码 -->
+    <view class="form-item">
+      <text class="form-label">密码</text>
+      <input
+        class="input-field"
+        placeholder="请输入密码"
+        password="{{true}}"
+        value="{{password}}"
+        bindinput="onPasswordInput"
+        bindconfirm="doLogin"
+      />
+    </view>
+
+    <!-- 登录按钮 -->
+    <button class="btn-primary" bindtap="doLogin" loading="{{loading}}" disabled="{{loading}}">
+      {{loading ? '登录中...' : '登 录'}}
+    </button>
+
+    <!-- 分割线 -->
+    <view class="divider">
+      <view class="divider-line"></view>
+      <text class="divider-text">或</text>
+      <view class="divider-line"></view>
+    </view>
+
+    <!-- 微信登录按钮 -->
+    <button
+      class="btn-wx"
+      bindtap="doWxLogin"
+      loading="{{wxLoading}}"
+      disabled="{{wxLoading}}"
+    >
+      💚 微信一键登录
+    </button>
+  </view>
+
+  <!-- 底部信息 -->
+  <view class="footer">
+    <text>Powered by Axum + WeChat MiniProgram</text>
+  </view>
+</view>

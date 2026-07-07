@@ -11,9 +11,11 @@ model = { workspace = true }
 utils = { workspace = true }
 anyhow = { workspace = true }
 serde = { workspace = true }
+serde_json = { workspace = true }
 casbin = { workspace = true }
 tokio = { workspace = true, features = ["sync"] }
 tracing = { workspace = true }
 utoipa = { workspace = true }
+reqwest = { workspace = true }
 [dev-dependencies]
 tokio = { workspace = true, features = ["full"] }

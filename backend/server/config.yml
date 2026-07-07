@@ -29,3 +29,7 @@ logger:
 jwt:
   secret: "your-256-bit-secret-key-change-in-production"
   expire_hours: 24
+# 微信小程序配置
+wechat:
+  appid: "wxfd0ce2d8a9e5ac26"
+  secret: "5cb306b31e5de8fede0300e0cecbfcbd"

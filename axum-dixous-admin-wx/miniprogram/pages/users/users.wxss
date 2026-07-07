@@ -1,0 +1,121 @@
+/* pages/users/users.wxss */
+.users-page {
+  min-height: 100vh;
+  padding-bottom: 40rpx;
+}
+
+.search-bar {
+  display: flex;
+  align-items: center;
+  gap: 16rpx;
+  padding: 24rpx;
+  background: #ffffff;
+}
+
+.search-input {
+  flex: 1;
+  background: #f5f7fa;
+  border: 1rpx solid #e4e7ed;
+  border-radius: 8rpx;
+  padding: 16rpx 24rpx;
+  font-size: 28rpx;
+}
+
+.search-btn {
+  background: #409eff !important;
+  color: #ffffff !important;
+  border: none !important;
+  font-size: 24rpx !important;
+  padding: 0 24rpx !important;
+  line-height: 60rpx !important;
+}
+
+.user-avatar {
+  width: 80rpx;
+  height: 80rpx;
+  border-radius: 50%;
+  background: #409eff;
+  color: #ffffff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 32rpx;
+  font-weight: 600;
+  flex-shrink: 0;
+}
+
+.user-info {
+  flex: 1;
+  margin-left: 24rpx;
+  display: flex;
+  flex-direction: column;
+  gap: 8rpx;
+  overflow: hidden;
+}
+
+.user-row {
+  display: flex;
+  align-items: center;
+  gap: 16rpx;
+}
+
+.user-name {
+  font-size: 30rpx;
+  font-weight: 500;
+  color: #303133;
+}
+
+.user-detail {
+  font-size: 24rpx;
+  color: #909399;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.user-id {
+  font-size: 24rpx;
+  color: #c0c4cc;
+  flex-shrink: 0;
+}
+
+.list-item {
+  display: flex;
+  align-items: center;
+  padding: 24rpx 0;
+  border-bottom: 1rpx solid #ebeef5;
+}
+
+.list-item:last-child {
+  border-bottom: none;
+}
+
+.empty-state,
+.loading-state,
+.end-state {
+  text-align: center;
+  padding: 48rpx 0;
+  color: #909399;
+  font-size: 26rpx;
+}
+
+.tag {
+  font-size: 20rpx;
+  padding: 4rpx 12rpx;
+  border-radius: 4rpx;
+}
+
+.tag-success {
+  background: #f0f9eb;
+  color: #67c23a;
+}
+
+.tag-danger {
+  background: #fef0f0;
+  color: #f56c6c;
+}
+
+.tag-wechat {
+  background: #e8f8f0;
+  color: #07c160;
+}
