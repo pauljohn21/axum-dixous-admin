@@ -7,6 +7,7 @@
 # IDE
 .vscode/
 .idea/
+.trea/
 *.swp
 *.swo
 
@@ -21,9 +22,6 @@ Thumbs.db
 # Dioxus
 **/.dioxus
 
-# Database
-data/mysql/
-data/redis/
 
 # Logs
 logs/
@@ -43,9 +41,10 @@ logs/
 
 # 文档外的临时文档
 .traefik.yml
-#server
-server/Cargo.lock
-server/target
+#backend
+backend/Cargo.lock
+backend/target/
+backend/data/
 #web
 web/node_modules
 web/pnpm-lock.yaml
