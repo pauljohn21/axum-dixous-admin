@@ -43,3 +43,10 @@ logs/
 
 # 文档外的临时文档
 .traefik.yml
+#server
+server/Cargo.lock
+server/target
+#web
+web/node_modules
+web/pnpm-lock.yaml
+web/.vscode

@@ -26,16 +26,19 @@ use utils::prelude::R;
 #[derive(OpenApi)]
 #[openapi(
     info(
-        title = "SCM Admin API",
+        title = "Admin API",
         version = "1.0.0",
         description = "后台管理系统 API"
     ),
     paths(
-        user_api::login, user_api::register, user_api::list, user_api::get_by_id, user_api::update, user_api::delete_user,
+        user_api::login, user_api::register, user_api::logout, user_api::list, user_api::get_by_id, user_api::update, user_api::delete_user,
+        user_api::get_user_info, user_api::change_password, user_api::dashboard_stats,
         role_api::create, role_api::list, role_api::get_by_id, role_api::update, role_api::delete_role,
         menu_api::create, menu_api::list, menu_api::get_by_id, menu_api::update, menu_api::delete_menu,
         api_api::create, api_api::list, api_api::get_by_id, api_api::update, api_api::delete_api,
         jwt_api::create, jwt_api::list, jwt_api::get_by_id, jwt_api::update, jwt_api::delete_jwt,
+        casbin_api::list, casbin_api::get_by_id, casbin_api::create, casbin_api::update, casbin_api::delete,
+        casbin_api::delete_batch, casbin_api::update_role_policies, casbin_api::get_policies_by_role, casbin_api::get_roles_for_user,
         menu_btn_api::create, menu_btn_api::list, menu_btn_api::get_by_id, menu_btn_api::update, menu_btn_api::delete_btn,
         menu_param_api::create, menu_param_api::list, menu_param_api::get_by_id, menu_param_api::update, menu_param_api::delete_param,
         role_btn_api::create, role_btn_api::list, role_btn_api::get_by_composite_id, role_btn_api::delete_role_btn,
@@ -69,7 +72,10 @@ use utils::prelude::R;
         sys_role_btns::Model, sys_role_menus::Model, sys_data_role_id::Model,
         sys_dictionaries::Model, sys_dictionary_details::Model,
         sys_operation_records::Model, sys_menu_role::Model, sys_menu_domain::Model,
-        user_api::LoginResp
+        user_api::LoginResp, user_api::UserInfoResp, user_api::ChangePasswordDTO,
+        service::DashboardStats,
+        service::casbin_service::CreateCasbinRuleRequest, service::casbin_service::UpdateCasbinRuleRequest,
+        casbin_api::BatchDeleteRequest, casbin_api::UpdateRolePoliciesRequest
     )),
     tags(
         (name = "用户管理", description = "用户 CRUD"),
@@ -128,7 +134,7 @@ pub fn protected_routes() -> Router {
 }
 
 pub fn swagger_routes() -> Router {
-    utoipa_swagger_ui::SwaggerUi::new("/swagger-ui")
+    utoipa_swagger_ui::SwaggerUi::new("/")
         .url("/openapi.json", ApiDoc::openapi())
         .into()
 }

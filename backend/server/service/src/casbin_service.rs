@@ -6,6 +6,8 @@ use model::dto::page_dto::{PageRequest, PageResponse};
 use model::prelude::CasbinRule;
 use utils::db_conn;
 
+use crate::enforcer::reload_policy;
+
 pub struct CasbinService;
 
 impl CasbinService {
@@ -54,7 +56,9 @@ impl CasbinService {
             v5: Set(rule.v5),
         };
         
-        active_model.insert(db).await.map_err(|e| anyhow!("创建规则失败: {}", e))
+        let result = active_model.insert(db).await.map_err(|e| anyhow!("创建规则失败: {}", e))?;
+        reload_policy().await;
+        Ok(result)
     }
 
     pub async fn update(id: u64, rule: UpdateCasbinRuleRequest) -> Result<casbin_rule::Model> {
@@ -89,7 +93,9 @@ impl CasbinService {
             active_model.v5 = Set(Some(v5));
         }
         
-        active_model.update(db).await.map_err(|e| anyhow!("更新规则失败: {}", e))
+        let result = active_model.update(db).await.map_err(|e| anyhow!("更新规则失败: {}", e))?;
+        reload_policy().await;
+        Ok(result)
     }
 
     pub async fn delete(id: u64) -> Result<()> {
@@ -102,7 +108,7 @@ impl CasbinService {
         if result.rows_affected == 0 {
             return Err(anyhow!("规则不存在或已被删除"));
         }
-        
+        reload_policy().await;
         Ok(())
     }
 
@@ -170,6 +176,7 @@ impl CasbinService {
         }
         
         txn.commit().await?;
+        reload_policy().await;
         Ok(())
     }
 
@@ -193,7 +200,7 @@ impl CasbinService {
     }
 }
 
-#[derive(Debug, Clone, serde::Deserialize, serde::Serialize)]
+#[derive(Debug, Clone, serde::Deserialize, serde::Serialize, utoipa::ToSchema)]
 pub struct CreateCasbinRuleRequest {
     pub ptype: Option<String>,
     pub v0: Option<String>,
@@ -204,7 +211,7 @@ pub struct CreateCasbinRuleRequest {
     pub v5: Option<String>,
 }
 
-#[derive(Debug, Clone, serde::Deserialize, serde::Serialize)]
+#[derive(Debug, Clone, serde::Deserialize, serde::Serialize, utoipa::ToSchema)]
 pub struct UpdateCasbinRuleRequest {
     pub ptype: Option<String>,
     pub v0: Option<String>,

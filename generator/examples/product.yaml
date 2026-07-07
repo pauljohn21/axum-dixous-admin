@@ -1,0 +1,43 @@
+# 产品管理模块配置
+# 运行: cargo run --manifest-path generator/Cargo.toml -- generate -c generator/examples/product.yaml
+
+# 数据库表名 (sys_ 前缀)
+table_name: sys_products
+
+# 资源名 (snake_case 单数，用于 API 路径 /api/product)
+resource: product
+
+# 中文模块名 (用于 API tag 和 i18n)
+module_cn: "产品管理"
+
+# Element Plus 图标名
+icon: goods
+
+# 字段定义
+fields:
+  - name: name
+    type: string
+    nullable: true
+    comment: "产品名称"
+    search: true              # 参与关键字搜索
+
+  - name: price
+    type: decimal
+    nullable: true
+    comment: "价格"
+
+  - name: stock
+    type: i32
+    nullable: true
+    comment: "库存"
+
+  - name: status
+    type: i8
+    nullable: true
+    comment: "状态"
+
+  - name: description
+    type: text
+    nullable: true
+    comment: "描述"
+    search: true

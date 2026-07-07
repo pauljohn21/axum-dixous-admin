@@ -1,5 +1,5 @@
 use anyhow::{anyhow, Result};
-use sea_orm::{ActiveModelTrait, ColumnTrait, EntityTrait, PaginatorTrait, QueryFilter, QuerySelect, Set};
+use sea_orm::{ActiveModelTrait, ColumnTrait, EntityTrait, PaginatorTrait, QueryFilter, QuerySelect, Set, TransactionTrait};
 
 use model::dao::sys_role;
 use model::dto::page_dto::{PageRequest, PageResponse};
@@ -63,7 +63,44 @@ impl SysRoleService {
     }
 
     pub async fn delete(id: i32) -> Result<()> {
-        SysRole::delete_by_id(id).exec(db_conn!()).await?;
+        let db = db_conn!();
+        let txn = db.begin().await?;
+
+        // 清理角色-菜单关联
+        use model::dao::sys_role_menus;
+        sys_role_menus::Entity::delete_many()
+            .filter(sys_role_menus::Column::SysRoleRoleId.eq(id as u64))
+            .exec(&txn)
+            .await?;
+
+        // 清理角色-按钮关联
+        use model::dao::sys_role_btns;
+        sys_role_btns::Entity::delete_many()
+            .filter(sys_role_btns::Column::RoleId.eq(id as u64))
+            .exec(&txn)
+            .await?;
+
+        // 清理用户-角色关联
+        use model::dao::sys_user_role;
+        sys_user_role::Entity::delete_many()
+            .filter(sys_user_role::Column::RoleId.eq(id))
+            .exec(&txn)
+            .await?;
+
+        // 清理 Casbin 策略中该角色的权限
+        use model::dao::casbin_rule;
+        casbin_rule::Entity::delete_many()
+            .filter(casbin_rule::Column::Ptype.eq("p"))
+            .filter(casbin_rule::Column::V0.eq(id.to_string()))
+            .exec(&txn)
+            .await?;
+
+        // 删除角色
+        SysRole::delete_by_id(id).exec(&txn).await?;
+        txn.commit().await?;
+
+        // 刷新 Casbin 缓存
+        crate::enforcer::reload_policy().await;
         Ok(())
     }
 }

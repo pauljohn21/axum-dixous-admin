@@ -4,7 +4,9 @@ use axum::response::{IntoResponse, Response};
 use casbin::{CachedEnforcer, CoreApi};
 use futures::future::BoxFuture;
 use tower::Layer;
-use utils::prelude::verify_token;
+use utils::prelude::{verify_token, DB};
+use model::dao::jwt_blacklists;
+use sea_orm::{ColumnTrait, EntityTrait, QueryFilter};
 
 use std::sync::Arc;
 use tokio::sync::RwLock;
@@ -68,10 +70,10 @@ where
         let enforcer = self.enforcer.clone();
 
         // 1. JWT 验证
-        let subject = if let Some(header) = auth_header {
+        let token_info = if let Some(header) = auth_header {
             if let Some(token) = header.strip_prefix("Bearer ") {
                 match verify_token(token) {
-                    Ok(claims) => Some(claims.sub),
+                    Ok(claims) => Some((claims.sub, token.to_string())),
                     Err(_) => None,
                 }
             } else {
@@ -82,7 +84,7 @@ where
         };
 
         // 2. 无 JWT → 401
-        let subject = match subject {
+        let (subject, token_str) = match token_info {
             Some(s) => s,
             None => {
                 return Box::pin(async move { Ok(StatusCode::UNAUTHORIZED.into_response()) });
@@ -98,6 +100,16 @@ where
         let mut inner = std::mem::replace(&mut self.inner, inner);
 
         Box::pin(async move {
+            // JWT 黑名单检查
+            let db = DB::db_connection().await;
+            let blacklisted = jwt_blacklists::Entity::find()
+                .filter(jwt_blacklists::Column::Jwt.eq(&token_str))
+                .one(&db)
+                .await;
+            if let Ok(Some(_)) = blacklisted {
+                return Ok(StatusCode::UNAUTHORIZED.into_response());
+            }
+
             let args = vec![subject, path, action];
             let result = {
                 let mut guard = enforcer.write().await;

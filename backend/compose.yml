@@ -1,15 +1,29 @@
+# ============================================================
+# Docker Compose for axum-dixous-admin (开发环境)
+# ============================================================
+# 常用命令:
+#   docker compose up -d          # 后台启动所有服务
+#   docker compose logs -f mysql  # 查看 MySQL 日志
+#   docker compose down           # 停止并移除容器
+#   docker compose restart redis  # 重启 Redis
+# ============================================================
+
+name: axum-admin-dev
+
 services:
+  # ==================== MySQL ====================
   mysql:
-    image: mysql
-    platform: linux/arm64 # 确保使用 arm64 架构
-    restart: always
+    image: mysql:8
+    platform: linux/arm64
+    restart: unless-stopped
     container_name: mysql
     ports:
       - "3306:3306"
     environment:
       MYSQL_ROOT_PASSWORD: root123456
       MYSQL_DATABASE: scm
-    command: 
+      TZ: Asia/Shanghai
+    command:
       --character-set-server=utf8mb4
       --collation-server=utf8mb4_general_ci
       --explicit_defaults_for_timestamp=true
@@ -18,39 +32,91 @@ services:
       --optimizer-trace-max-mem-size=102400
     volumes:
       - ./data/mysql:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "127.0.0.1", "-u", "root", "-proot123456"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    networks:
+      - admin-net
+
+  # ==================== Redis ====================
+  redis:
+    image: redis:7-alpine
+    platform: linux/arm64
+    restart: unless-stopped
+    container_name: redis
+    ports:
+      - "6379:6379"
+    mem_limit: 256m
+    cpus: 0.5
+    command:
+      - redis-server
+      - --appendonly
+      - "yes"
+      - --maxmemory
+      - 200mb
+      - --maxmemory-policy
+      - allkeys-lru
+    volumes:
+      - ./data/redis:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+      start_period: 5s
+    networks:
+      - admin-net
+
+  # ==================== Adminer (数据库可视化管理) ====================
+  db_manager:
+    image: adminer
+    platform: linux/arm64
+    restart: unless-stopped
+    container_name: db_manager
+    ports:
+      - "8090:8080"
+    environment:
+      TZ: Asia/Shanghai
+    depends_on:
+      mysql:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - admin-net
+
+  # ==================== PostgreSQL (备用，按需启用) ====================
+  # 如需切换到 PostgreSQL，取消下方注释并修改 config.yml:
+  #   datasource:
+  #     driver: postgres
+  #     host: localhost
+  #     port: 5432
+  # --------------------------------------------------
   # postgres:
-  #   image: postgres
-  #   platform: linux/arm64 # 确保使用 arm64 架构
-  #   restart: always
+  #   image: postgres:16-alpine
+  #   platform: linux/arm64
+  #   restart: unless-stopped
   #   container_name: pg
   #   ports:
   #     - "5432:5432"
   #   environment:
   #     POSTGRES_PASSWORD: root123456
   #     POSTGRES_DB: scm
+  #     TZ: Asia/Shanghai
   #   volumes:
   #     - ./data/postgres:/var/lib/postgresql/data
+  #   healthcheck:
+  #     test: ["CMD-SHELL", "pg_isready -U root -d scm"]
+  #     interval: 10s
+  #     timeout: 5s
+  #     retries: 5
+  #     start_period: 10s
+  #   networks:
+  #     - admin-net
 
-  redis:
-    image: redis:7-alpine3.18 # 使用带有 arm64 支持的最新版本
-    platform: linux/arm64 # 确保使用 arm64 架构
-    restart: always
-    container_name: redis
-    ports:
-      - "6379:6379"
-    deploy:
-      resources:
-        limits:
-          cpus: "0.5" # 根据需要调整 CPU 限制
-          memory: 256M # 根据需要调整内存限制
-    command: ["redis-server", "--appendonly", "yes"] # 启用 AOF 持久化
-    volumes:
-      - ./data/redis:/data # 持久化存储路径
-
-  db_manager:
-    image: adminer
-    platform: linux/arm64 # 确保使用 arm64 架构
-    restart: always
-    container_name: db_manager
-    ports:
-      - "8090:8080"
+networks:
+  admin-net:
+    driver: bridge

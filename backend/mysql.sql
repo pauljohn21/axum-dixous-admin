@@ -376,6 +376,7 @@ INSERT INTO `sys_role_menus` (`sys_base_menu_id`, `sys_role_role_id`) VALUES
 (2,	8881),
 (2,	9528),
 (3,	888),
+(3,	8881),
 (4,	888),
 (4,	8881),
 (5,	888),
@@ -384,39 +385,11 @@ INSERT INTO `sys_role_menus` (`sys_base_menu_id`, `sys_role_role_id`) VALUES
 (6,	8881),
 (7,	888),
 (7,	8881),
+(7,	9528),
 (8,	888),
 (8,	8881),
-(8,	9528),
 (9,	888),
-(9,	8881),
-(10,	888),
-(10,	8881),
-(11,	888),
-(11,	8881),
-(12,	888),
-(13,	888),
-(13,	8881),
-(14,	888),
-(14,	8881),
-(15,	888),
-(15,	8881),
-(16,	888),
-(16,	8881),
-(17,	888),
-(17,	8881),
-(18,	888),
-(19,	888),
-(20,	888),
-(21,	888),
-(22,	888),
-(23,	888),
-(24,	888),
-(25,	888),
-(26,	888),
-(27,	888),
-(28,	888),
-(29,	888),
-(30,	888);
+(9,	8881);
 
 
 
@@ -446,19 +419,15 @@ CREATE TABLE `sys_base_menus` (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 INSERT INTO `sys_base_menus` (`id`, `created_at`, `updated_at`, `deleted_at`, `menu_level`, `parent_id`, `path`, `name`, `hidden`, `component`, `sort`, `active_name`, `keep_alive`, `default_menu`, `title`, `icon`, `close_tab`) VALUES
-(1,	'2024-04-23 11:20:33.340',	'2024-04-23 11:20:33.340',	NULL,	0,	0,	'dashboard',	'dashboard',	0,	'view/dashboard/index.vue',	1,	'',	0,	0,	'仪表盘',	'odometer',	0),
-(2,	'2024-04-23 11:20:33.340',	'2024-04-23 11:20:33.340',	NULL,	0,	0,	'about',	'about',	0,	'view/about/index.vue',	9,	'',	0,	0,	'关于我们',	'info-filled',	0),
-(3,	'2024-04-23 11:20:33.340',	'2024-04-23 11:20:33.340',	NULL,	0,	0,	'admin',	'superAdmin',	0,	'view/superAdmin/index.vue',	3,	'',	0,	0,	'超级管理员',	'user',	0),
-(4,	'2024-04-23 11:20:33.340',	'2024-04-23 11:20:33.340',	NULL,	0,	3,	'role',	'role',	0,	'view/superAdmin/role/role.vue',	1,	'',	0,	0,	'角色管理',	'avatar',	0),
-(5,	'2024-04-23 11:20:33.340',	'2024-04-23 11:20:33.340',	NULL,	0,	3,	'menu',	'menu',	0,	'view/superAdmin/menu/menu.vue',	2,	'',	1,	0,	'菜单管理',	'tickets',	0),
-(6,	'2024-04-23 11:20:33.340',	'2024-04-23 11:20:33.340',	NULL,	0,	3,	'api',	'api',	0,	'view/superAdmin/api/api.vue',	3,	'',	1,	0,	'api管理',	'platform',	0),
-(7,	'2024-04-23 11:20:33.340',	'2024-04-23 11:20:33.340',	NULL,	0,	3,	'user',	'user',	0,	'view/superAdmin/user/user.vue',	4,	'',	0,	0,	'用户管理',	'coordinate',	0),
-(8,	'2024-04-23 11:20:33.340',	'2024-04-23 11:20:33.340',	NULL,	0,	3,	'dictionary',	'dictionary',	0,	'view/superAdmin/dictionary/sysDictionary.vue',	5,	'',	0,	0,	'字典管理',	'notebook',	0),
-(9,	'2024-04-23 11:20:33.340',	'2024-04-23 11:20:33.340',	NULL,	0,	3,	'operation',	'operation',	0,	'view/superAdmin/operation/sysOperationRecord.vue',	6,	'',	0,	0,	'操作历史',	'pie-chart',	0),
-(10,	'2024-04-23 11:20:33.340',	'2024-04-23 11:20:33.340',	NULL,	0,	0,	'person',	'person',	1,	'view/person/person.vue',	4,	'',	0,	0,	'个人信息',	'message',	0),
-(11,	'2024-04-23 11:20:33.340',	'2024-04-23 11:20:33.340',	NULL,	0,	0,	'systemTools',	'systemTools',	0,	'view/systemTools/index.vue',	5,	'',	0,	0,	'系统工具',	'tools',	0),
-(12,	'2024-04-23 11:20:33.340',	'2024-04-23 11:20:33.340',	NULL,	0,	15,	'system',	'system',	0,	'view/systemTools/system/system.vue',	3,	'',	0,	0,	'系统配置',	'operation',	0),
-(13,	'2024-04-23 11:20:33.340',	'2024-04-23 11:20:33.340',	NULL,	0,	0,	'state',	'state',	0,	'view/system/state.vue',	8,	'',	0,	0,	'服务器状态',	'cloudy',	0),
+(1,	'2024-04-23 11:20:33.340',	'2024-04-23 11:20:33.340',	NULL,	0,	0,	'dashboard',	'dashboard',	0,	'',	1,	'',	0,	0,	'仪表盘',	'odometer',	0),
+(2,	'2024-04-23 11:20:33.340',	'2024-04-23 11:20:33.340',	NULL,	0,	0,	'admin',	'superAdmin',	0,	'',	2,	'',	0,	0,	'超级管理员',	'user',	0),
+(3,	'2024-04-23 11:20:33.340',	'2024-04-23 11:20:33.340',	NULL,	0,	2,	'role',	'role',	0,	'',	1,	'',	0,	0,	'角色管理',	'avatar',	0),
+(4,	'2024-04-23 11:20:33.340',	'2024-04-23 11:20:33.340',	NULL,	0,	2,	'menu',	'menu',	0,	'',	2,	'',	0,	0,	'菜单管理',	'tickets',	0),
+(5,	'2024-04-23 11:20:33.340',	'2024-04-23 11:20:33.340',	NULL,	0,	2,	'api',	'api',	0,	'',	3,	'',	0,	0,	'API管理',	'platform',	0),
+(6,	'2024-04-23 11:20:33.340',	'2024-04-23 11:20:33.340',	NULL,	0,	2,	'user',	'user',	0,	'',	4,	'',	0,	0,	'用户管理',	'coordinate',	0),
+(7,	'2024-04-23 11:20:33.340',	'2024-04-23 11:20:33.340',	NULL,	0,	0,	'dictionary',	'dictionary',	0,	'',	3,	'',	0,	0,	'字典管理',	'dict',	0),
+(8,	'2024-04-23 11:20:33.340',	'2024-04-23 11:20:33.340',	NULL,	0,	0,	'profile',	'profile',	0,	'',	4,	'',	0,	0,	'个人信息',	'message',	0),
+(9,	'2024-04-23 11:20:33.340',	'2024-04-23 11:20:33.340',	NULL,	0,	0,	'settings',	'settings',	0,	'',	5,	'',	0,	0,	'系统设置',	'setting',	0);
 
 DROP TABLE IF EXISTS `sys_data_role_id`;
 CREATE TABLE `sys_data_role_id` (

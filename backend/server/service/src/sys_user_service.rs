@@ -101,8 +101,59 @@ impl SysUserService {
         Ok(updated.update(db).await?)
     }
 
-    pub async fn delete(id: i32) -> Result<()> {
-        SysUser::delete_by_id(id).exec(db_conn!()).await?;
+    /// 修改密码
+    pub async fn change_password(username: &str, old_password: String, new_password: String) -> Result<()> {
+        let db = db_conn!();
+        let user = SysUser::find()
+            .filter(sys_user::Column::Username.eq(username))
+            .one(db)
+            .await?
+            .ok_or_else(|| anyhow!("用户不存在"))?;
+
+        // 验证旧密码
+        PasswordUtils::verify(&old_password, &user.password.clone().unwrap_or_default(), &user.salt.clone().unwrap_or_default())
+            .map_err(|_| anyhow!("原密码错误"))?;
+
+        // 加密新密码
+        let hash = PasswordUtils::encrypt(&new_password);
+
+        let mut active: ActiveModel = user.into();
+        active.password = Set(Some(hash.password_hash));
+        active.salt = Set(Some(hash.salt));
+        active.update(db).await?;
         Ok(())
+    }
+
+    /// 删除用户并清理关联数据 (sys_user_role)
+    pub async fn delete(id: i32) -> Result<()> {
+        let db = db_conn!();
+        let txn = db.begin().await?;
+
+        // 清理用户-角色关联
+        use model::dao::sys_user_role;
+        sys_user_role::Entity::delete_many()
+            .filter(sys_user_role::Column::UserId.eq(id))
+            .exec(&txn)
+            .await?;
+
+        // 删除用户
+        SysUser::delete_by_id(id).exec(&txn).await?;
+        txn.commit().await?;
+        Ok(())
+    }
+
+    /// 仪表盘统计数据
+    pub async fn dashboard_stats() -> Result<crate::DashboardStats> {
+        let db = db_conn!();
+        let user_count = SysUser::find().count(db).await?;
+        let role_count = model::prelude::SysRole::find().count(db).await?;
+        let menu_count = model::prelude::SysMenu::find().count(db).await?;
+        let api_count = model::prelude::SysApis::find().count(db).await?;
+        Ok(crate::DashboardStats {
+            user_count,
+            role_count,
+            menu_count,
+            api_count,
+        })
     }
 }

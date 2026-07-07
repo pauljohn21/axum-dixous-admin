@@ -1,0 +1,11 @@
+[package]
+name = "axum-admin-generator"
+version = "0.1.0"
+edition = "2021"
+description = "全栈 CRUD 代码生成器 — axum-dixous-admin 专用"
+
+[dependencies]
+clap = { version = "4", features = ["derive"] }
+serde = { version = "1", features = ["derive"] }
+serde_yaml = "0.9"
+chrono = "0.4"

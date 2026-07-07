@@ -11,5 +11,9 @@ model = { workspace = true }
 utils = { workspace = true }
 anyhow = { workspace = true }
 serde = { workspace = true }
+casbin = { workspace = true }
+tokio = { workspace = true, features = ["sync"] }
+tracing = { workspace = true }
+utoipa = { workspace = true }
 [dev-dependencies]
 tokio = { workspace = true, features = ["full"] }

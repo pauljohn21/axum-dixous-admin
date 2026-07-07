@@ -1,4 +1,5 @@
 pub mod casbin_service;
+pub mod enforcer;
 pub mod jwt_blacklist_service;
 pub mod sys_api_service;
 pub mod sys_base_menu_btn_service;
@@ -15,3 +16,12 @@ pub mod sys_role_menu_service;
 pub mod sys_role_service;
 pub mod sys_user_role_service;
 pub mod sys_user_service;
+
+/// 仪表盘统计数据
+#[derive(serde::Serialize, utoipa::ToSchema)]
+pub struct DashboardStats {
+    pub user_count: u64,
+    pub role_count: u64,
+    pub menu_count: u64,
+    pub api_count: u64,
+}

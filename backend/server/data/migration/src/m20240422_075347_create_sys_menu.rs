@@ -18,7 +18,7 @@ impl MigrationTrait for Migration {
                     .col(string_len(SysMenu::Path, 199).comment("路由path"))
                     .col(string_len(SysMenu::Name, 199).comment("路由name"))
                     .col(tiny_unsigned(SysMenu::Hidden).comment("是否在列表隐藏"))
-                    .col(string(SysMenu::Component).comment("对应前端文件路径"))
+                    .col(string(SysMenu::Component).comment("对应前端组件标识"))
                     .col(big_integer(SysMenu::Sort).comment("排序标记"))
                     .col(string(SysMenu::ActiveName).comment("附加属性"))
                     .col(tiny_integer(SysMenu::KeepAlive).comment("附加属性"))
@@ -35,6 +35,18 @@ impl MigrationTrait for Migration {
             )
             .await?;
 
+        // 菜单数据 — 与前端 Dioxus 路由保持一致
+        //
+        // 菜单结构:
+        //   1. 仪表盘        (dashboard)     parent=0  sort=1
+        //   2. 超级管理员     (admin)         parent=0  sort=2  [父菜单]
+        //      3. 角色管理   (role)          parent=2  sort=1
+        //      4. 菜单管理   (menu)          parent=2  sort=2
+        //      5. API管理    (api)           parent=2  sort=3
+        //      6. 用户管理   (user)          parent=2  sort=4
+        //   7. 字典管理      (dictionary)    parent=0  sort=3
+        //   8. 个人信息      (profile)       parent=0  sort=4
+        //   9. 系统设置      (settings)      parent=0  sort=5
         let insert = Query::insert()
             .into_table(SysMenu::Table)
             .columns([
@@ -53,12 +65,13 @@ impl MigrationTrait for Migration {
                 SysMenu::CloseTab,
             ])
             .values_panic([
+                // ID=1: 仪表盘
                 0.into(),
                 0.into(),
                 "dashboard".into(),
                 "dashboard".into(),
                 0.into(),
-                "view/dashboard/index.vue".into(),
+                "".into(),
                 1.into(),
                 "".into(),
                 0.into(),
@@ -68,28 +81,14 @@ impl MigrationTrait for Migration {
                 0.into(),
             ])
             .values_panic([
-                0.into(),
-                0.into(),
-                "about".into(),
-                "about".into(),
-                0.into(),
-                "view/about/index.vue".into(),
-                9.into(),
-                "".into(),
-                0.into(),
-                0.into(),
-                "关于我们".into(),
-                "info-filled".into(),
-                0.into(),
-            ])
-            .values_panic([
+                // ID=2: 超级管理员（父菜单）
                 0.into(),
                 0.into(),
                 "admin".into(),
                 "superAdmin".into(),
                 0.into(),
-                "view/superAdmin/index.vue".into(),
-                3.into(),
+                "".into(),
+                2.into(),
                 "".into(),
                 0.into(),
                 0.into(),
@@ -98,12 +97,13 @@ impl MigrationTrait for Migration {
                 0.into(),
             ])
             .values_panic([
+                // ID=3: 角色管理（子菜单，parent=2）
                 0.into(),
-                3.into(),
+                2.into(),
                 "role".into(),
                 "role".into(),
                 0.into(),
-                "view/superAdmin/role/role.vue".into(),
+                "".into(),
                 1.into(),
                 "".into(),
                 0.into(),
@@ -113,12 +113,13 @@ impl MigrationTrait for Migration {
                 0.into(),
             ])
             .values_panic([
+                // ID=4: 菜单管理（子菜单，parent=2）
                 0.into(),
-                3.into(),
+                2.into(),
                 "menu".into(),
                 "menu".into(),
                 0.into(),
-                "view/superAdmin/menu/menu.vue".into(),
+                "".into(),
                 2.into(),
                 "".into(),
                 0.into(),
@@ -128,27 +129,29 @@ impl MigrationTrait for Migration {
                 0.into(),
             ])
             .values_panic([
+                // ID=5: API管理（子菜单，parent=2）
                 0.into(),
-                3.into(),
+                2.into(),
                 "api".into(),
                 "api".into(),
                 0.into(),
-                "view/superAdmin/api/api.vue".into(),
+                "".into(),
                 3.into(),
                 "".into(),
                 0.into(),
                 0.into(),
-                "api管理".into(),
-                "latform".into(),
+                "API管理".into(),
+                "platform".into(),
                 0.into(),
             ])
             .values_panic([
+                // ID=6: 用户管理（子菜单，parent=2）
                 0.into(),
-                3.into(),
+                2.into(),
                 "user".into(),
                 "user".into(),
                 0.into(),
-                "view/superAdmin/user/user.vue".into(),
+                "".into(),
                 4.into(),
                 "".into(),
                 0.into(),
@@ -158,13 +161,14 @@ impl MigrationTrait for Migration {
                 0.into(),
             ])
             .values_panic([
+                // ID=7: 字典管理
                 0.into(),
                 0.into(),
                 "dictionary".into(),
                 "dictionary".into(),
                 0.into(),
-                "view/superAdmin/dictionary/sysDictionary.vue".into(),
-                5.into(),
+                "".into(),
+                3.into(),
                 "".into(),
                 0.into(),
                 0.into(),
@@ -173,27 +177,13 @@ impl MigrationTrait for Migration {
                 0.into(),
             ])
             .values_panic([
+                // ID=8: 个人信息
                 0.into(),
                 0.into(),
-                "operation".into(),
-                "operation".into(),
+                "profile".into(),
+                "profile".into(),
                 0.into(),
-                "view/superAdmin/operation/sysOperationRecord.vue".into(),
-                6.into(),
                 "".into(),
-                0.into(),
-                0.into(),
-                "操作历史".into(),
-                "pie-chart".into(),
-                0.into(),
-            ])
-            .values_panic([
-                0.into(),
-                0.into(),
-                "person".into(),
-                "person".into(),
-                0.into(),
-                "view/person/person.vue".into(),
                 4.into(),
                 "".into(),
                 0.into(),
@@ -203,48 +193,19 @@ impl MigrationTrait for Migration {
                 0.into(),
             ])
             .values_panic([
+                // ID=9: 系统设置
                 0.into(),
                 0.into(),
-                "systemTools".into(),
-                "systemTools".into(),
+                "settings".into(),
+                "settings".into(),
                 0.into(),
-                "view/systemTools/index.vue".into(),
+                "".into(),
                 5.into(),
                 "".into(),
                 0.into(),
                 0.into(),
-                "系统工具".into(),
-                "tools".into(),
-                0.into(),
-            ])
-            .values_panic([
-                0.into(),
-                0.into(),
-                "system".into(),
-                "system".into(),
-                0.into(),
-                "view/systemTools/system/system.vue".into(),
-                3.into(),
-                "".into(),
-                0.into(),
-                0.into(),
-                "系统配置".into(),
-                "operation".into(),
-                0.into(),
-            ])
-            .values_panic([
-                0.into(),
-                0.into(),
-                "state".into(),
-                "state".into(),
-                0.into(),
-                "view/system/state.vue".into(),
-                8.into(),
-                "".into(),
-                0.into(),
-                0.into(),
-                "服务器状态".into(),
-                "cloudy".into(),
+                "系统设置".into(),
+                "setting".into(),
                 0.into(),
             ])
             .to_owned();

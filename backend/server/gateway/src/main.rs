@@ -22,6 +22,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         CachedEnforcer::new(model, adapter).await?,
     ));
 
+    // 将 enforcer 注入 service 层，用于策略修改后刷新缓存
+    service::enforcer::set_enforcer(enforcer.clone());
+
     let auth_layer = AuthLayer::new(enforcer);
 
     // CORS
@@ -39,7 +42,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let addr = CONFIG.server.clone().addr();
     info!("服务启动于 {}", addr);
-    info!("Swagger UI : {}/swagger-ui", addr);
+    info!("Swagger UI : {}/", addr);
 
     let listener = tokio::net::TcpListener::bind(addr).await?;
     axum::serve(listener, app).await?;

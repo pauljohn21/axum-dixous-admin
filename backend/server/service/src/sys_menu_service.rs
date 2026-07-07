@@ -1,5 +1,5 @@
 use anyhow::{anyhow, Result};
-use sea_orm::{ActiveModelTrait, ColumnTrait, EntityTrait, PaginatorTrait, QueryFilter, QuerySelect, Set};
+use sea_orm::{ActiveModelTrait, ColumnTrait, EntityTrait, PaginatorTrait, QueryFilter, QuerySelect, Set, TransactionTrait};
 
 use model::dao::sys_menu;
 use model::dto::page_dto::{PageRequest, PageResponse};
@@ -79,7 +79,33 @@ impl SysMenuService {
     }
 
     pub async fn delete(id: i32) -> Result<()> {
-        SysMenu::delete_by_id(id).exec(db_conn!()).await?;
+        let db = db_conn!();
+        let txn = db.begin().await?;
+
+        // 清理角色-菜单关联
+        use model::dao::sys_role_menus;
+        sys_role_menus::Entity::delete_many()
+            .filter(sys_role_menus::Column::SysBaseMenuId.eq(id as u64))
+            .exec(&txn)
+            .await?;
+
+        // 清理菜单按钮
+        use model::dao::sys_base_menu_btns;
+        sys_base_menu_btns::Entity::delete_many()
+            .filter(sys_base_menu_btns::Column::SysBaseMenuId.eq(id as u64))
+            .exec(&txn)
+            .await?;
+
+        // 清理菜单参数
+        use model::dao::sys_base_menu_parameters;
+        sys_base_menu_parameters::Entity::delete_many()
+            .filter(sys_base_menu_parameters::Column::SysBaseMenuId.eq(id as u64))
+            .exec(&txn)
+            .await?;
+
+        // 删除菜单
+        SysMenu::delete_by_id(id).exec(&txn).await?;
+        txn.commit().await?;
         Ok(())
     }
 

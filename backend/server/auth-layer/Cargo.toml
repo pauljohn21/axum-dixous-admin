@@ -12,3 +12,5 @@ tokio = { workspace = true, features = ["sync"] }
 tower = { workspace = true }
 utils = { workspace = true }
 tracing = { workspace = true }
+model = { workspace = true }
+sea-orm = { workspace = true }
