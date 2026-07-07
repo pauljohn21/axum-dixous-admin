@@ -1,3 +1,4 @@
+use anyhow::Result;
 use sea_orm::{EntityTrait, Set};
 use sea_orm::DatabaseTransaction;
 
@@ -9,11 +10,12 @@ use model::prelude::SysUserRole;
 pub struct SysUserRoleService;
 
 impl SysUserRoleService {
-    pub async fn add_users(db: &DatabaseTransaction, data: SysUserRoleAddDto) {
+    pub async fn add_users(db: &DatabaseTransaction, data: SysUserRoleAddDto) -> Result<()> {
         let user = sys_user_role::ActiveModel {
             user_id: Set(data.user_id),
             role_id: Set(data.role_id),
         };
-        SysUserRole::insert(user).exec(db).await.unwrap();
+        SysUserRole::insert(user).exec(db).await?;
+        Ok(())
     }
 }

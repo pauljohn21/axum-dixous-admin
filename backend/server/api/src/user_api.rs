@@ -22,6 +22,10 @@ pub struct LoginResp { pub token: String }
 #[derive(Serialize, ToSchema)]
 pub struct UserInfoResp {
     pub username: String,
+    pub nick_name: Option<String>,
+    pub phone: Option<String>,
+    pub email: Option<String>,
+    pub header_img: Option<String>,
     pub menus: Vec<sys_menu::Model>,
 }
 
@@ -133,11 +137,19 @@ pub async fn delete_user(Path(id): Path<i32>) -> Result<impl IntoResponse, AppEr
     tag = "用户管理"
 )]
 pub async fn get_user_info(Extension(username): Extension<Username>) -> Result<impl IntoResponse, AppError> {
+    // 查询完整用户信息
+    let user = SysUserService::user_info(username.0.clone())
+        .await
+        .map_err(AppError::Anyhow)?;
     let menus = SysMenuService::get_menus_by_username(&username.0)
         .await
         .map_err(AppError::Anyhow)?;
     Ok(R::ok(UserInfoResp {
-        username: username.0,
+        username: user.username.unwrap_or_default(),
+        nick_name: user.nick_name,
+        phone: user.phone,
+        email: user.email,
+        header_img: user.header_img,
         menus,
     }))
 }

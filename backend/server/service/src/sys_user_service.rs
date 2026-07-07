@@ -1,5 +1,5 @@
 use anyhow::{anyhow, Result};
-use sea_orm::{ActiveModelTrait, ColumnTrait, DbErr, EntityTrait, PaginatorTrait, QueryFilter, QuerySelect, Set, TransactionTrait};
+use sea_orm::{ActiveModelTrait, ColumnTrait, EntityTrait, PaginatorTrait, QueryFilter, QuerySelect, Set, TransactionTrait};
 
 use model::dao::sys_user;
 use model::dao::sys_user::ActiveModel;
@@ -15,8 +15,9 @@ use crate::sys_user_role_service::SysUserRoleService;
 pub struct SysUserService;
 
 impl SysUserService {
-    pub async fn insert(data: SysUserInsertDTO) -> Result<(), DbErr> {
-        let txn = db_conn!().begin().await?;
+    pub async fn insert(data: SysUserInsertDTO) -> Result<()> {
+        let db = db_conn!();
+        let txn = db.begin().await?;
         let hash = PasswordUtils::encrypt(&data.password);
 
         let insert = ActiveModel {
@@ -30,12 +31,16 @@ impl SysUserService {
         };
 
         let save = SysUser::insert(insert).exec(&txn).await?;
-        let role = SysUserRoleAddDto {
-            user_id: save.last_insert_id,
-            role_id: data.role_id,
-        };
-        SysUserRoleService::add_users(&txn, role).await;
-        txn.commit().await
+        // 仅当指定了 role_id 时才创建用户-角色关联
+        if let Some(role_id) = data.role_id {
+            let role = SysUserRoleAddDto {
+                user_id: save.last_insert_id,
+                role_id,
+            };
+            SysUserRoleService::add_users(&txn, role).await?;
+        }
+        txn.commit().await?;
+        Ok(())
     }
 
     pub async fn login(data: LoginDTO) -> Result<sys_user::Model> {

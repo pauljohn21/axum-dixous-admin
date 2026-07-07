@@ -37,13 +37,13 @@ impl MigratorTrait for Migrator {
 impl Migrator {
     pub async fn migration_init() {
         match CONFIG.datasource.migration.to_string().trim() {
-            "fresh" => match Migrator::fresh(&DB::db_connection().await).await {
+            "fresh" => match Migrator::fresh(DB::db_connection().await).await {
                 Ok(_) => info!("初始化成功"),
                 Err(e) => info!("初始化失败: {}",e)
             }
-            "up" => Migrator::up(&DB::db_connection().await, None).await.expect("无法升级数据源"),
-            "down" => Migrator::down(&DB::db_connection().await, None).await.expect("无法降级数据源"),
-            "reset" => Migrator::reset(&DB::db_connection().await).await.expect("无法重置数据源"),
+            "up" => Migrator::up(DB::db_connection().await, None).await.expect("无法升级数据源"),
+            "down" => Migrator::down(DB::db_connection().await, None).await.expect("无法降级数据源"),
+            "reset" => Migrator::reset(DB::db_connection().await).await.expect("无法重置数据源"),
             _ => println!("无数据迁移"),
         }
     }

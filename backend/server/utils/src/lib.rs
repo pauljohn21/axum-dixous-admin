@@ -17,7 +17,7 @@ mod res;
 #[macro_export]
 macro_rules! db_conn {
     () => {
-        &utils::prelude::DB::db_connection().await
+        utils::prelude::DB::db_connection().await
     };
 }
 

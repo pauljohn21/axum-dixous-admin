@@ -104,7 +104,7 @@ where
             let db = DB::db_connection().await;
             let blacklisted = jwt_blacklists::Entity::find()
                 .filter(jwt_blacklists::Column::Jwt.eq(&token_str))
-                .one(&db)
+                .one(db)
                 .await;
             if let Ok(Some(_)) = blacklisted {
                 return Ok(StatusCode::UNAUTHORIZED.into_response());
@@ -112,8 +112,8 @@ where
 
             let args = vec![subject, path, action];
             let result = {
-                let mut guard = enforcer.write().await;
-                guard.enforce_mut(args)
+                let guard = enforcer.read().await;
+                guard.enforce(args)
             };
 
             match result {

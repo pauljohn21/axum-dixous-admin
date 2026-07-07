@@ -4,7 +4,7 @@ use utoipa::ToSchema;
 pub struct SysUserInsertDTO {
     pub username: String,
     pub password: String,
-    pub role_id: i32,
+    pub role_id: Option<i32>,
     pub nick_name: Option<String>,
     pub phone: Option<String>,
     pub email: Option<String>,
