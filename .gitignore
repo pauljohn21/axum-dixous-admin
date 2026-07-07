@@ -49,3 +49,4 @@ backend/data/
 web/node_modules
 web/pnpm-lock.yaml
 web/.vscode
+*.png
