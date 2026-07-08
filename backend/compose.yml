@@ -2,10 +2,11 @@
 # Docker Compose for axum-dixous-admin (开发环境)
 # ============================================================
 # 常用命令:
-#   docker compose up -d          # 后台启动所有服务
-#   docker compose logs -f mysql  # 查看 MySQL 日志
-#   docker compose down           # 停止并移除容器
-#   docker compose restart redis  # 重启 Redis
+#   docker compose up -d              # 后台启动所有服务
+#   docker compose up -d backend      # 仅启动后端 (含 MySQL/Redis)
+#   docker compose logs -f backend    # 查看后端日志
+#   docker compose down               # 停止并移除容器
+#   docker compose restart redis      # 重启 Redis
 # ============================================================
 
 name: axum-admin-dev
@@ -114,6 +115,32 @@ services:
   #     timeout: 5s
   #     retries: 5
   #     start_period: 10s
+  #   networks:
+  #     - admin-net
+
+  # # ==================== Backend (Axum 后端) ====================
+  # backend:
+  #   build:
+  #     context: ./server
+  #     dockerfile: Dockerfile
+  #   platform: linux/arm64
+  #   restart: unless-stopped
+  #   container_name: admin-backend
+  #   ports:
+  #     - "8888:8888"
+  #   environment:
+  #     TZ: Asia/Shanghai
+  #   depends_on:
+  #     mysql:
+  #       condition: service_healthy
+  #     redis:
+  #       condition: service_healthy
+  #   healthcheck:
+  #     test: ["CMD", "curl", "-sf", "http://localhost:8888/health"]
+  #     interval: 10s
+  #     timeout: 3s
+  #     retries: 3
+  #     start_period: 15s
   #   networks:
   #     - admin-net
 
