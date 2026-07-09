@@ -14,3 +14,4 @@ pub mod sys_role_dto;
 pub mod sys_role_menu_dto;
 pub mod sys_user_dto;
 pub mod sys_user_role;
+pub mod sys_generator_history_dto;

@@ -170,6 +170,7 @@ gateway (main.rs)           → 启动入口，组装路由和中间件
 #### 数据迁移
 
 - 迁移模式由 `config.yml` 中 `migration` 字段控制: `fresh` / `up` / `down` / `reset`
+- **当前开发环境使用 `fresh`**: 每次重启服务会 drop 所有表并重新执行全部迁移，因此修改现有迁移文件（如添加初始数据）后直接重启即可生效，无需新建迁移文件
 - 新建迁移: `cd backend/server/shell && sh migrate_table.sh`
 - 生成实体: `cd backend/server/shell && sh gen_entity.sh`
 

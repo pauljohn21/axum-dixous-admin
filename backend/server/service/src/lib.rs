@@ -16,6 +16,8 @@ pub mod sys_role_menu_service;
 pub mod sys_role_service;
 pub mod sys_user_role_service;
 pub mod sys_user_service;
+pub mod generator_history_service;
+pub mod generator_code_service;
 
 /// 仪表盘统计数据
 #[derive(serde::Serialize, utoipa::ToSchema)]

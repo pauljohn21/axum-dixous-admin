@@ -13,31 +13,80 @@ module_cn: "产品管理"
 # Element Plus 图标名
 icon: goods
 
+# 是否生成后端 (可选, 默认 true)
+generate_backend: true
+
+# 是否生成前端 (可选, 默认 true)
+generate_frontend: true
+
+# 是否支持批量删除 (可选, 默认 true)
+batch_delete: true
+
 # 字段定义
 fields:
   - name: name
     type: string
     nullable: true
     comment: "产品名称"
-    search: true              # 参与关键字搜索
+    search: true              # 简化搜索 (等同 search_type: like)
+    require: false
+    form: true                # 表单中显示
+    table: true               # 表格中显示
+    sort: true                # 可排序
 
   - name: price
     type: decimal
     nullable: true
     comment: "价格"
+    search_type: between      # 范围搜索
+    form: true
+    table: true
+    sort: true
 
   - name: stock
     type: i32
     nullable: true
     comment: "库存"
+    search_type: gte          # 大于等于搜索
+    form: true
+    table: true
+    sort: true
 
   - name: status
     type: i8
     nullable: true
     comment: "状态"
+    search_type: eq           # 精确匹配搜索
+    form: true
+    table: true
 
   - name: description
     type: text
     nullable: true
     comment: "描述"
     search: true
+    form: true
+    table: false              # 表格中不显示 (内容太长)
+
+  - name: tags
+    type: array
+    nullable: true
+    comment: "标签"
+    form: true
+    table: true
+
+  - name: metadata
+    type: json
+    nullable: true
+    comment: "元数据"
+    form: true
+    table: false              # 表格中不显示
+
+  - name: level
+    type: enum
+    nullable: true
+    comment: "级别"
+    enum_values: "low,medium,high"
+    search_type: eq
+    form: true
+    table: true

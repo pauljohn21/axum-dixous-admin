@@ -32,6 +32,7 @@ pub fn to_pascal(s: &str) -> String {
 /// - 前端 Model:      SysProduct            (单数 + Sys 前缀)
 /// - 前端组件:        ProductManage          (PascalCase(resource) + Manage)
 pub struct Naming {
+    #[allow(dead_code)]
     /// sys_products (复数表名)
     pub table_name: String,
     /// product (单数资源名)
@@ -59,6 +60,7 @@ pub struct Naming {
     /// 产品管理 (中文模块名)
     pub module_cn: String,
     /// Element Plus 图标
+    #[allow(dead_code)]
     pub icon: String,
 }
 

@@ -12,6 +12,7 @@ pub mod role_api;
 pub mod role_btn_api;
 pub mod role_menu_api;
 pub mod user_api;
+pub mod generator_api;
 
 use axum::Router;
 use axum::routing::post;
@@ -46,7 +47,9 @@ use utils::prelude::R;
         data_role_api::create, data_role_api::list, data_role_api::get_by_composite_id, data_role_api::delete_data_role,
         dictionary_api::create, dictionary_api::list, dictionary_api::get_by_id, dictionary_api::update, dictionary_api::delete_dict,
         dictionary_detail_api::create, dictionary_detail_api::list, dictionary_detail_api::get_by_id, dictionary_detail_api::update, dictionary_detail_api::delete_detail,
-        operation_record_api::create, operation_record_api::list, operation_record_api::get_by_id, operation_record_api::update, operation_record_api::delete_record
+        operation_record_api::create, operation_record_api::list, operation_record_api::get_by_id, operation_record_api::update, operation_record_api::delete_record,
+        generator_api::create_history, generator_api::list_history, generator_api::get_history_by_id, generator_api::get_history_meta, generator_api::update_history, generator_api::delete_history,
+        generator_api::rollback, generator_api::get_databases, generator_api::get_tables, generator_api::get_columns, generator_api::generate_from_table
     ),
     components(schemas(
         R<serde_json::Value>,
@@ -68,12 +71,16 @@ use utils::prelude::R;
         sys_dictionary_dto::SysDictionaryInsertDTO, sys_dictionary_dto::SysDictionaryUpdateDTO, sys_dictionary_dto::SysDictionaryQueryDTO,
         sys_dictionary_detail_dto::SysDictionaryDetailInsertDTO, sys_dictionary_detail_dto::SysDictionaryDetailUpdateDTO, sys_dictionary_detail_dto::SysDictionaryDetailQueryDTO,
         sys_operation_record_dto::SysOperationRecordInsertDTO, sys_operation_record_dto::SysOperationRecordUpdateDTO, sys_operation_record_dto::SysOperationRecordQueryDTO,
+        sys_generator_history_dto::SysGeneratorHistoryInsertDTO, sys_generator_history_dto::SysGeneratorHistoryUpdateDTO, sys_generator_history_dto::SysGeneratorHistoryQueryDTO,
+        sys_generator_history_dto::GeneratorRollbackDTO, sys_generator_history_dto::GenerateFromTableDTO,
+        sys_generator_history_dto::DatabaseInfo, sys_generator_history_dto::TableInfo, sys_generator_history_dto::ColumnInfo,
         sys_user::Model, sys_role::Model, sys_menu::Model, sys_apis::Model,
         jwt_blacklists::Model, casbin_rule::Model,
         sys_base_menu_btns::Model, sys_base_menu_parameters::Model,
         sys_role_btns::Model, sys_role_menus::Model, sys_data_role_id::Model,
         sys_dictionaries::Model, sys_dictionary_details::Model,
         sys_operation_records::Model, sys_menu_role::Model, sys_menu_domain::Model,
+        sys_generator_history::Model,
         user_api::LoginResp, user_api::UserInfoResp, user_api::ChangePasswordDTO,
         service::DashboardStats,
         service::casbin_service::CreateCasbinRuleRequest, service::casbin_service::UpdateCasbinRuleRequest,
@@ -93,7 +100,8 @@ use utils::prelude::R;
         (name = "数据权限", description = "角色数据权限"),
         (name = "字典管理", description = "系统字典 CRUD"),
         (name = "字典详情", description = "字典项 CRUD"),
-        (name = "操作记录", description = "操作日志查询")
+        (name = "操作记录", description = "操作日志查询"),
+        (name = "代码生成器", description = "代码生成历史与回滚")
     ),
     modifiers(&SecurityAddon)
 )]
@@ -134,6 +142,7 @@ pub fn protected_routes() -> Router {
         .merge(dictionary_api::routes())
         .merge(dictionary_detail_api::routes())
         .merge(operation_record_api::routes())
+        .merge(generator_api::routes())
 }
 
 pub fn swagger_routes() -> Router {

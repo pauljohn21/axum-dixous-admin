@@ -15,3 +15,4 @@ pub use super::sys_role_btns::Entity as SysRoleBtns;
 pub use super::sys_role_menus::Entity as SysRoleMenus;
 pub use super::sys_user::Entity as SysUser;
 pub use super::sys_user_role::Entity as SysUserRole;
+pub use super::sys_generator_history::Entity as SysGeneratorHistory;

@@ -9,6 +9,7 @@ use crate::naming::Naming;
 use std::path::Path;
 
 /// 注册结果
+#[allow(dead_code)]
 pub struct RegistryResult {
     pub warnings: Vec<String>,
 }
@@ -266,6 +267,7 @@ pub fn register_api(
 }
 
 /// 在特定 section (如 paths(, schemas(, tags() 中找到最后一行匹配并在其后插入
+#[allow(dead_code)]
 fn insert_after_last_match_in_section(
     content: &str,
     section_start: &str,

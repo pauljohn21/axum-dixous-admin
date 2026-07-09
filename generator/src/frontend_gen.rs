@@ -5,7 +5,7 @@
 //! 2. API 后端调用封装
 //! 3. Component CRUD 页面组件
 
-use crate::config::ModuleConfig;
+use crate::config::{FieldConfig, ModuleConfig};
 use crate::naming::Naming;
 use crate::type_map::{
     get_type_mapping, frontend_field_type, frontend_insert_type, frontend_update_type,
@@ -16,21 +16,28 @@ pub fn gen_model(config: &ModuleConfig, naming: &Naming) -> String {
     let struct_name = &naming.pascal_singular;
     let insert_name = format!("{}InsertDTO", naming.pascal_singular);
     let update_name = format!("{}UpdateDTO", naming.pascal_singular);
+    let query_name = format!("{}QueryDTO", naming.pascal_singular);
 
     // Model 字段
     let mut model_fields = String::new();
     model_fields.push_str("    pub id: i32,\n");
     for field in &config.fields {
         let fe_type = frontend_field_type(field);
-        model_fields.push_str(&format!("    #[serde(default)]\n"));
+        let mapping = get_type_mapping(&field.field_type);
+        if mapping.is_json {
+            model_fields.push_str("    #[serde(default)]\n");
+        } else {
+            model_fields.push_str("    #[serde(default)]\n");
+        }
         model_fields.push_str(&format!("    pub {}: {},\n", field.name, fe_type));
     }
     model_fields.push_str("    #[serde(default)]\n");
     model_fields.push_str("    pub created_at: Option<String>,\n");
 
-    // InsertDTO 字段
+    // InsertDTO 字段 — 只包含 form=true 的字段
+    let form_fields: Vec<&FieldConfig> = config.fields.iter().filter(|f| f.form).collect();
     let mut insert_fields = String::new();
-    for field in &config.fields {
+    for field in &form_fields {
         let fe_type = frontend_insert_type(field);
         let mapping = get_type_mapping(&field.field_type);
         if mapping.is_string {
@@ -43,12 +50,51 @@ pub fn gen_model(config: &ModuleConfig, naming: &Naming) -> String {
         }
     }
 
-    // UpdateDTO 字段 (全部可选)
+    // UpdateDTO 字段 (全部可选) — 只包含 form=true 的字段
     let mut update_fields = String::new();
-    for field in &config.fields {
+    for field in &form_fields {
         let fe_type = frontend_update_type(field);
         update_fields.push_str(&format!("    #[serde(skip_serializing_if = \"Option::is_none\")]\n"));
         update_fields.push_str(&format!("    pub {}: {},\n", field.name, fe_type));
+    }
+
+    // QueryDTO — 分页 + 搜索条件
+    let searchable_fields: Vec<&FieldConfig> = config.fields.iter().filter(|f| f.is_searchable()).collect();
+    let sortable_fields: Vec<&FieldConfig> = config.fields.iter().filter(|f| f.sort).collect();
+
+    let mut query_fields = String::new();
+    query_fields.push_str("    pub page: Option<u32>,\n");
+    query_fields.push_str("    pub page_size: Option<u32>,\n");
+    query_fields.push_str("    pub keyword: Option<String>,\n");
+
+    for field in &searchable_fields {
+        let mapping = get_type_mapping(&field.field_type);
+        let search_type = crate::type_map::SearchType::from_str(field.effective_search_type());
+        if search_type.is_range() {
+            query_fields.push_str(&format!(
+                "    #[serde(skip_serializing_if = \"Option::is_none\")]\n    pub start_{}: Option<{}>,\n",
+                field.name, mapping.frontend_rust
+            ));
+            query_fields.push_str(&format!(
+                "    #[serde(skip_serializing_if = \"Option::is_none\")]\n    pub end_{}: Option<{}>,\n",
+                field.name, mapping.frontend_rust
+            ));
+        } else if mapping.is_string {
+            query_fields.push_str(&format!(
+                "    #[serde(skip_serializing_if = \"Option::is_none\")]\n    pub {}: Option<String>,\n",
+                field.name
+            ));
+        } else {
+            query_fields.push_str(&format!(
+                "    #[serde(skip_serializing_if = \"Option::is_none\")]\n    pub {}: Option<{}>,\n",
+                field.name, mapping.frontend_rust
+            ));
+        }
+    }
+
+    if !sortable_fields.is_empty() {
+        query_fields.push_str("    #[serde(skip_serializing_if = \"Option::is_none\")]\n    pub sort_field: Option<String>,\n");
+        query_fields.push_str("    #[serde(skip_serializing_if = \"Option::is_none\")]\n    pub sort_order: Option<String>,\n");
     }
 
     format!(
@@ -65,6 +111,10 @@ pub struct {insert_name} {{
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct {update_name} {{
 {update_fields}}}
+
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+pub struct {query_name} {{
+{query_fields}}}
 "#,
         struct_name = struct_name,
         model_fields = model_fields.trim_end_matches('\n'),
@@ -72,31 +122,81 @@ pub struct {update_name} {{
         insert_fields = insert_fields.trim_end_matches('\n'),
         update_name = update_name,
         update_fields = update_fields.trim_end_matches('\n'),
+        query_name = query_name,
+        query_fields = query_fields.trim_end_matches('\n'),
     )
 }
 
 /// 生成前端 API 文件
-pub fn gen_api(_config: &ModuleConfig, naming: &Naming) -> String {
+pub fn gen_api(config: &ModuleConfig, naming: &Naming) -> String {
     let model_module = &naming.fe_file;
     let api_path = &naming.resource;
     let struct_name = &naming.pascal_singular;
     let insert_dto = format!("{}InsertDTO", naming.pascal_singular);
     let update_dto = format!("{}UpdateDTO", naming.pascal_singular);
+    let query_dto = format!("{}QueryDTO", naming.pascal_singular);
     let delete_fn = format!("delete_{}", naming.resource);
 
-    format!(
-        r#"use crate::http::{{build_page_query, delete_void, get_with_query, post, put}};
-use crate::models::common::PageResponse;
-use crate::models::{model_module}::{{{struct_name}, {insert_dto}, {update_dto}}};
+    // 是否有搜索/排序
+    let has_search = config.fields.iter().any(|f| f.is_searchable());
+    let has_sort = config.fields.iter().any(|f| f.sort);
+    let use_query_dto = has_search || has_sort;
 
-pub async fn list(
+    // list 函数参数
+    let list_fn = if use_query_dto {
+        format!(
+            r#"pub async fn list(query: &{query_dto}) -> Result<PageResponse<{struct_name}>, String> {{
+    let query_str = serde_qs::to_string(query).unwrap_or_default();
+    get_with_query("/api/{api_path}/list", &query_str).await
+}}"#,
+            query_dto = query_dto,
+            struct_name = struct_name,
+            api_path = api_path,
+        )
+    } else {
+        format!(
+            r#"pub async fn list(
     page: Option<u32>,
     page_size: Option<u32>,
     keyword: Option<&str>,
 ) -> Result<PageResponse<{struct_name}>, String> {{
     let query = build_page_query(page, page_size, keyword);
     get_with_query("/api/{api_path}/list", &query).await
+}}"#,
+            struct_name = struct_name,
+            api_path = api_path,
+        )
+    };
+
+    // 批量删除
+    let batch_delete_fn = if config.batch_delete {
+        format!(
+            r#"
+pub async fn delete_batch(ids: Vec<i32>) -> Result<(), String> {{
+    post("/api/{api_path}/batch", &ids).await
 }}
+"#,
+            api_path = api_path,
+        )
+    } else {
+        String::new()
+    };
+
+    // import
+    let imports = if use_query_dto {
+        format!(
+            "use crate::http::{{delete_void, get_with_query, post, put}};\nuse crate::models::common::PageResponse;\nuse crate::models::{model_module}::{{{struct_name}, {insert_dto}, {update_dto}, {query_dto}}};"
+        )
+    } else {
+        format!(
+            "use crate::http::{{build_page_query, delete_void, get_with_query, post, put}};\nuse crate::models::common::PageResponse;\nuse crate::models::{model_module}::{{{struct_name}, {insert_dto}, {update_dto}}};"
+        )
+    };
+
+    format!(
+        r#"{imports}
+
+{list_fn}
 
 pub async fn create(data: {insert_dto}) -> Result<(), String> {{
     post("/api/{api_path}", &data).await
@@ -109,13 +209,15 @@ pub async fn update(id: i32, data: {update_dto}) -> Result<{struct_name}, String
 pub async fn {delete_fn}(id: i32) -> Result<(), String> {{
     delete_void(&format!("/api/{api_path}/{{}}", id)).await
 }}
-"#,
-        model_module = model_module,
-        struct_name = struct_name,
+{batch_delete_fn}"#,
+        imports = imports,
+        list_fn = list_fn,
         insert_dto = insert_dto,
         update_dto = update_dto,
+        struct_name = struct_name,
         api_path = api_path,
         delete_fn = delete_fn,
+        batch_delete_fn = batch_delete_fn,
     )
 }
 
@@ -126,33 +228,85 @@ pub fn gen_component(config: &ModuleConfig, naming: &Naming) -> String {
     let struct_name = &naming.pascal_singular;
     let insert_dto = format!("{}InsertDTO", naming.pascal_singular);
     let update_dto = format!("{}UpdateDTO", naming.pascal_singular);
+    let query_dto = format!("{}QueryDTO", naming.pascal_singular);
     let api_module = &naming.fe_file;
     let delete_fn = format!("delete_{}", naming.resource);
 
-    // TKey 变体 (使用 pascal_resource，无 Sys 前缀)
+    // TKey 变体
     let manage_key = format!("{}Manage", naming.pascal_resource);
     let add_key = format!("Add{}", naming.pascal_resource);
     let edit_key = format!("Edit{}", naming.pascal_resource);
     let search_key = format!("Search{}Placeholder", naming.pascal_resource);
 
-    // 信号声明 (每个字段一个 form_ 信号)
+    // 可搜索字段
+    let searchable_fields: Vec<&FieldConfig> = config.fields.iter().filter(|f| f.is_searchable()).collect();
+    let has_search = !searchable_fields.is_empty();
+    let use_query_dto = has_search || config.fields.iter().any(|f| f.sort);
+
+    // 表单字段 (form=true)
+    let form_fields: Vec<&FieldConfig> = config.fields.iter().filter(|f| f.form).collect();
+    // 表格字段 (table=true)
+    let table_fields: Vec<&FieldConfig> = config.fields.iter().filter(|f| f.table).collect();
+
+    // 信号声明 (每个表单字段一个 form_ 信号)
     let mut signal_decls = String::new();
-    for field in &config.fields {
+    for field in &form_fields {
         signal_decls.push_str(&format!(
             "    let mut form_{} = use_signal(String::new);\n",
             field.name
         ));
     }
 
+    // 搜索信号声明
+    let mut search_signal_decls = String::new();
+    for field in &searchable_fields {
+        search_signal_decls.push_str(&format!(
+            "    let mut search_{} = use_signal(String::new);\n",
+            field.name
+        ));
+    }
+
     // fetch 函数中的 API 调用
-    let fetch_call = format!(
-        "            match api::{}::list(Some(current_page()), Some(page_size), Some(&kw)).await {{",
-        api_module
-    );
+    let fetch_call = if use_query_dto {
+        format!(
+            r#"            let query = {query_dto} {{
+                page: Some(current_page()),
+                page_size: Some(page_size),
+                keyword: if keyword().is_empty() {{ None }} else {{ Some(keyword().as_str()) }},
+{search_field_fills}            }};
+            match api::{api_module}::list(&query).await {{"#,
+            query_dto = query_dto,
+            api_module = api_module,
+            search_field_fills = {
+                let mut fills = String::new();
+                for field in &searchable_fields {
+                    let mapping = get_type_mapping(&field.field_type);
+                    let signal = format!("search_{}()", field.name);
+                    if mapping.is_string {
+                        fills.push_str(&format!(
+                            "                {}: if {}.is_empty() {{ None }} else {{ Some({}) }},\n",
+                            field.name, signal, signal
+                        ));
+                    } else {
+                        fills.push_str(&format!(
+                            "                {}: {}.parse::<{}>().ok(),\n",
+                            field.name, signal, mapping.frontend_rust
+                        ));
+                    }
+                }
+                fills
+            }
+        )
+    } else {
+        format!(
+            "            match api::{}::list(Some(current_page()), Some(page_size), Some(&kw)).await {{",
+            api_module
+        )
+    };
 
     // on_add 重置表单
     let mut on_add_resets = String::new();
-    for field in &config.fields {
+    for field in &form_fields {
         on_add_resets.push_str(&format!(
             "        form_{}.set(String::new());\n",
             field.name
@@ -161,7 +315,7 @@ pub fn gen_component(config: &ModuleConfig, naming: &Naming) -> String {
 
     // on_edit 填充表单
     let mut on_edit_fills = String::new();
-    for field in &config.fields {
+    for field in &form_fields {
         let mapping = get_type_mapping(&field.field_type);
         if mapping.is_string {
             on_edit_fills.push_str(&format!(
@@ -171,6 +325,11 @@ pub fn gen_component(config: &ModuleConfig, naming: &Naming) -> String {
         } else if mapping.is_bool {
             on_edit_fills.push_str(&format!(
                 "        form_{}.set(item.{}.map(|b| if b {{ \"true\".into() }} else {{ \"false\".into() }}).unwrap_or_default());\n",
+                field.name, field.name
+            ));
+        } else if mapping.is_json {
+            on_edit_fills.push_str(&format!(
+                "        form_{}.set(item.{}.as_ref().map(|v| v.to_string()).unwrap_or_default());\n",
                 field.name, field.name
             ));
         } else {
@@ -195,9 +354,32 @@ pub fn gen_component(config: &ModuleConfig, naming: &Naming) -> String {
         api_module, delete_fn
     );
 
-    // on_submit 中的 InsertDTO 构造
+    // 批量删除
+    let batch_delete_ui = if config.batch_delete {
+        format!(
+            r#"    let mut selected_ids = use_signal(Vec::new);
+
+    let on_batch_delete = move |_| {{
+        if selected_ids().is_empty() {{
+            return;
+        }}
+        spawn(async move {{
+            match api::{api_module}::delete_batch(selected_ids()).await {{
+                Ok(_) => {{ selected_ids.set(Vec::new()); fetch_data(); }}
+                Err(e) => {{ error_msg.set(Some(e)); }}
+            }}
+        }});
+    }};
+"#,
+            api_module = api_module,
+        )
+    } else {
+        String::new()
+    };
+
+    // on_submit 中的 InsertDTO 构造 — 只包含 form=true 的字段
     let mut insert_dto_fields = String::new();
-    for field in &config.fields {
+    for field in &form_fields {
         let mapping = get_type_mapping(&field.field_type);
         let signal = format!("form_{}()", field.name);
         if mapping.is_string {
@@ -209,6 +391,11 @@ pub fn gen_component(config: &ModuleConfig, naming: &Naming) -> String {
             insert_dto_fields.push_str(&format!(
                 "                {}: if {}.is_empty() {{ None }} else {{ Some({} == \"true\" || {} == \"1\") }},\n",
                 field.name, signal, signal, signal
+            ));
+        } else if mapping.is_json {
+            insert_dto_fields.push_str(&format!(
+                "                {}: if {}.is_empty() {{ None }} else {{ Some(serde_json::from_str(&{}).unwrap_or_default()) }},\n",
+                field.name, signal, signal
             ));
         } else if mapping.is_numeric {
             let parse_type = mapping.frontend_rust;
@@ -226,7 +413,7 @@ pub fn gen_component(config: &ModuleConfig, naming: &Naming) -> String {
 
     // on_submit 中的 UpdateDTO 构造
     let mut update_dto_fields = String::new();
-    for field in &config.fields {
+    for field in &form_fields {
         let mapping = get_type_mapping(&field.field_type);
         let signal = format!("form_{}()", field.name);
         if mapping.is_string {
@@ -238,6 +425,11 @@ pub fn gen_component(config: &ModuleConfig, naming: &Naming) -> String {
             update_dto_fields.push_str(&format!(
                 "                {}: if {}.is_empty() {{ None }} else {{ Some({} == \"true\" || {} == \"1\") }},\n",
                 field.name, signal, signal, signal
+            ));
+        } else if mapping.is_json {
+            update_dto_fields.push_str(&format!(
+                "                {}: if {}.is_empty() {{ None }} else {{ Some(serde_json::from_str(&{}).unwrap_or_default()) }},\n",
+                field.name, signal, signal
             ));
         } else if mapping.is_numeric {
             let parse_type = mapping.frontend_rust;
@@ -253,11 +445,33 @@ pub fn gen_component(config: &ModuleConfig, naming: &Naming) -> String {
         }
     }
 
-    // 表格列头
+    // 表格列头 — 只包含 table=true 的字段
     let mut th_cells = String::new();
     th_cells.push_str(r#"                            th { style: "{th_s}", "ID" }"#);
     th_cells.push('\n');
-    for field in &config.fields {
+    // 批量删除时添加复选框列头
+    if config.batch_delete {
+        th_cells.push_str(r#"                            th { style: "{th_s}", input {#"#);
+        th_cells.push('\n');
+        th_cells.push_str(r#"                                r#type: "checkbox","#);
+        th_cells.push('\n');
+        th_cells.push_str(r#"                                on_change: move |e: Event<FormData>| {"#);
+        th_cells.push('\n');
+        th_cells.push_str(r#"                                    if e.data().value() == "true" {"#);
+        th_cells.push_str(r#"                                        selected_ids.set(data_list().iter().map(|item| item.id).collect());"#);
+        th_cells.push('\n');
+        th_cells.push_str(r#"                                    } else {"#);
+        th_cells.push('\n');
+        th_cells.push_str(r#"                                        selected_ids.set(Vec::new());"#);
+        th_cells.push('\n');
+        th_cells.push_str(r#"                                    }"#);
+        th_cells.push('\n');
+        th_cells.push_str(r#"                                }"#);
+        th_cells.push('\n');
+        th_cells.push_str(r#"                            }} }"#);
+        th_cells.push('\n');
+    }
+    for field in &table_fields {
         let field_key = format!("{}{}", naming.pascal_resource, crate::naming::to_pascal(&field.name));
         th_cells.push_str(&format!(
             r#"                            th {{ style: "{{th_s}}", "{{t(TKey::{})}}" }}"#,
@@ -271,7 +485,28 @@ pub fn gen_component(config: &ModuleConfig, naming: &Naming) -> String {
     let mut td_cells = String::new();
     td_cells.push_str(r#"                                    td { style: "{td_s}", "{item.id}" }"#);
     td_cells.push('\n');
-    for field in &config.fields {
+    // 批量删除时添加复选框
+    if config.batch_delete {
+        td_cells.push_str(r#"                                    td {
+                                        style: "{td_s}",
+                                        input {
+                                            r#type: "checkbox",
+                                            checked: selected_ids().contains(&item.id),
+                                            on_change: {
+                                                let item_id = item.id;
+                                                move |e: Event<FormData>| {
+                                                    if e.data().value() == "true" {
+                                                        selected_ids.write().push(item_id);
+                                                    } else {
+                                                        selected_ids.write().retain(|&id| id != item_id);
+                                                    }
+                                                }
+                                            }
+                                        }
+                                    }"#);
+        td_cells.push('\n');
+    }
+    for field in &table_fields {
         let mapping = get_type_mapping(&field.field_type);
         if mapping.is_string {
             td_cells.push_str(&format!(
@@ -281,6 +516,11 @@ pub fn gen_component(config: &ModuleConfig, naming: &Naming) -> String {
         } else if mapping.is_bool {
             td_cells.push_str(&format!(
                 r#"                                    td {{ style: "{{td_s}}", "{{item.{}.map(|b| if b {{ t(TKey::Enabled) }} else {{ t(TKey::Disabled) }}).unwrap_or_default()}}" }}"#,
+                field.name
+            ));
+        } else if mapping.is_json {
+            td_cells.push_str(&format!(
+                r#"                                    td {{ style: "{{td_s}}", "{{item.{}.as_ref().map(|v| v.to_string()).unwrap_or_default()}}" }}"#,
                 field.name
             ));
         } else {
@@ -300,16 +540,127 @@ pub fn gen_component(config: &ModuleConfig, naming: &Naming) -> String {
                                         }
                                     }"#);
 
-    let colspan = config.fields.len() + 2; // ID + fields + Action
+    let colspan = table_fields.len() + 2 + if config.batch_delete { 1 } else { 0 };
 
-    // 对话框表单字段
+    // 搜索区域
+    let search_ui = if has_search {
+        let mut inputs = String::new();
+        for field in &searchable_fields {
+            let placeholder_key = format!("{}{}Placeholder", naming.pascal_resource, crate::naming::to_pascal(&field.name));
+            let signal = format!("search_{}", field.name);
+            inputs.push_str(&format!(
+                r#"                div {{
+                    style: "flex: 1; max-width: 200px;",
+                    Input {{
+                        value: Some({signal}()),
+                        placeholder: Some(t(TKey::{ph})),
+                        on_change: move |e: Event<FormData>| {{ {signal}.set(e.data().value()); }}
+                    }}
+                }}
+"#,
+                signal = signal,
+                ph = placeholder_key,
+            ));
+        }
+        format!(
+            r#"            div {{
+                style: "display: flex; gap: 12px; margin-bottom: 20px; background: var(--el-bg-color); padding: 16px; border-radius: 8px; box-shadow: var(--el-box-shadow-light); flex-wrap: wrap;",
+                div {{
+                    style: "flex: 1; max-width: 300px;",
+                    Input {{
+                        value: Some(keyword()),
+                        placeholder: Some(t(TKey::{search_key})),
+                        on_change: move |e: Event<FormData>| {{ keyword.set(e.data().value()); }}
+                    }}
+                }}
+{inputs}                Button {{ variant: ButtonVariant::Primary, on_click: move |_| {{ current_page.set(1); fetch_data(); }}, "{{t(TKey::Search)}}" }}
+            }}"#,
+            search_key = search_key,
+            inputs = inputs,
+        )
+    } else {
+        format!(
+            r#"            div {{
+                style: "display: flex; gap: 12px; margin-bottom: 20px; background: var(--el-bg-color); padding: 16px; border-radius: 8px; box-shadow: var(--el-box-shadow-light);",
+                div {{
+                    style: "flex: 1; max-width: 300px;",
+                    Input {{
+                        value: Some(keyword()),
+                        placeholder: Some(t(TKey::{search_key})),
+                        on_change: move |e: Event<FormData>| {{ keyword.set(e.data().value()); }}
+                    }}
+                }}
+                Button {{ variant: ButtonVariant::Primary, on_click: move |_| {{ current_page.set(1); fetch_data(); }}, "{{t(TKey::Search)}}" }}
+            }}"#,
+            search_key = search_key,
+        )
+    };
+
+    // 批量删除按钮
+    let batch_delete_button = if config.batch_delete {
+        format!(
+            r#"                Button {{ variant: ButtonVariant::Danger, on_click: on_batch_delete, disabled: selected_ids().is_empty(), "{{t(TKey::BatchDelete)}}" }}"#,
+        )
+    } else {
+        String::new()
+    };
+
+    // 对话框表单字段 — 只包含 form=true 的字段
     let mut form_inputs = String::new();
-    for field in &config.fields {
+    for field in &form_fields {
         let field_key = format!("{}{}", naming.pascal_resource, crate::naming::to_pascal(&field.name));
         let placeholder_key = format!("{}{}Placeholder", naming.pascal_resource, crate::naming::to_pascal(&field.name));
         let signal = format!("form_{}", field.name);
-        form_inputs.push_str(&format!(
-            r#"                        div {{
+        let mapping = get_type_mapping(&field.field_type);
+
+        if mapping.is_bool {
+            // 布尔类型用 Select
+            form_inputs.push_str(&format!(
+                r#"                        div {{
+                            style: "margin-bottom: 16px;",
+                            label {{ style: "display: block; font-size: 14px; color: var(--el-text-color-regular); margin-bottom: 8px;", "{{t(TKey::{})}}" }}
+                            Select {{
+                                value: Some({signal}()),
+                                placeholder: Some(t(TKey::{ph})),
+                                on_change: move |e: Event<FormData>| {{ {signal}.set(e.data().value()); }},
+                                SelectOption {{ value: "true".to_string(), label: "{{t(TKey::Enabled)}}" }}
+                                SelectOption {{ value: "false".to_string(), label: "{{t(TKey::Disabled)}}" }}
+                            }}
+                        }}
+"#,
+                field_key,
+                ph = placeholder_key,
+                signal = signal,
+            ));
+        } else if mapping.is_enum && !field.enum_values.is_empty() {
+            // 枚举类型用 Select
+            let options: Vec<String> = field.enum_values.split(',')
+                .map(|v| {
+                    let v = v.trim();
+                    format!(r#"                                SelectOption {{ value: "{}".to_string(), label: "{}" }}"#, v, v)
+                })
+                .collect();
+            form_inputs.push_str(&format!(
+                r#"                        div {{
+                            style: "margin-bottom: 16px;",
+                            label {{ style: "display: block; font-size: 14px; color: var(--el-text-color-regular); margin-bottom: 8px;", "{{t(TKey::{field_key})}}" }}
+                            Select {{
+                                value: Some({signal}()),
+                                placeholder: Some(t(TKey::{ph})),
+                                on_change: move |e: Event<FormData>| {{ {signal}.set(e.data().value()); }},
+{options}
+                            }}
+                        }}
+"#,
+                field_key = field_key,
+                ph = placeholder_key,
+                signal = signal,
+                options = options.join("\n"),
+            ));
+        } else {
+            // 默认用 Input
+            form_inputs.push_str(&format!(
+                r#"                        div {{
                             style: "margin-bottom: 16px;",
                             label {{ style: "display: block; font-size: 14px; color: var(--el-text-color-regular); margin-bottom: 8px;", "{{t(TKey::{})}}" }}
                             Input {{
@@ -319,10 +670,11 @@ pub fn gen_component(config: &ModuleConfig, naming: &Naming) -> String {
                             }}
                         }}
 "#,
-            field_key,
-            ph = placeholder_key,
-            signal = signal,
-        ));
+                field_key,
+                ph = placeholder_key,
+                signal = signal,
+            ));
+        }
     }
 
     format!(
@@ -331,7 +683,7 @@ use dioxus_element_plug::prelude::*;
 
 use crate::api;
 use crate::i18n::{{t, t_paging, TKey}};
-use crate::models::{model_module}::{{{struct_name}, {insert_dto}, {update_dto}}};
+use crate::models::{model_module}::{{{struct_name}, {insert_dto}, {update_dto}{query_dto_import}}};
 
 /// {module_cn} 页面
 #[component]
@@ -347,7 +699,7 @@ pub fn {component_name}() -> Element {{
     let mut dialog_visible = use_signal(|| false);
     let mut is_edit = use_signal(|| false);
     let mut edit_id = use_signal(|| 0i32);
-{signal_decls}
+{signal_decls}{search_signal_decls}{batch_delete_ui}
     let mut fetch_data = move || {{
         loading.set(true);
         error_msg.set(None);
@@ -412,25 +764,17 @@ pub fn {component_name}() -> Element {{
             div {{
                 style: "display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;",
                 h2 {{ style: "font-size: 20px; font-weight: 600; color: var(--el-text-color-primary); margin: 0;", "{{t(TKey::{manage_key})}}" }}
-                Button {{ variant: ButtonVariant::Primary, on_click: on_add, "{{t(TKey::{add_key})}}" }}
+                div {{ style: "display: flex; gap: 8px;",
+                    {batch_delete_button}
+                    Button {{ variant: ButtonVariant::Primary, on_click: on_add, "{{t(TKey::{add_key})}}" }}
+                }}
             }}
 
             if let Some(msg) = error_msg() {{
                 div {{ style: "background: var(--el-color-danger-light-9); color: var(--el-color-danger); border-radius: 4px; padding: 10px 16px; margin-bottom: 16px; font-size: 14px;", "{{msg}}" }}
             }}
 
-            div {{
-                style: "display: flex; gap: 12px; margin-bottom: 20px; background: var(--el-bg-color); padding: 16px; border-radius: 8px; box-shadow: var(--el-box-shadow-light);",
-                div {{
-                    style: "flex: 1; max-width: 300px;",
-                    Input {{
-                        value: Some(keyword()),
-                        placeholder: Some(t(TKey::{search_key})),
-                        on_change: move |e: Event<FormData>| {{ keyword.set(e.data().value()); }}
-                    }}
-                }}
-                Button {{ variant: ButtonVariant::Primary, on_click: move |_| {{ current_page.set(1); fetch_data(); }}, "{{t(TKey::Search)}}" }}
-            }}
+{search_ui}
 
             div {{
                 style: "background: var(--el-bg-color); border-radius: 8px; box-shadow: var(--el-box-shadow-light); overflow: hidden;",
@@ -488,13 +832,16 @@ pub fn {component_name}() -> Element {{
     }}
 }}
 "#,
-        module_cn = naming.module_cn,
-        component_name = component_name,
         model_module = model_module,
         struct_name = struct_name,
         insert_dto = insert_dto,
         update_dto = update_dto,
+        query_dto_import = if use_query_dto { format!(", {}", query_dto) } else { String::new() },
+        module_cn = naming.module_cn,
+        component_name = component_name,
         signal_decls = signal_decls,
+        search_signal_decls = search_signal_decls,
+        batch_delete_ui = batch_delete_ui,
         fetch_call = fetch_call,
         on_add_resets = on_add_resets,
         on_edit_fills = on_edit_fills,
@@ -505,7 +852,8 @@ pub fn {component_name}() -> Element {{
         manage_key = manage_key,
         add_key = add_key,
         edit_key = edit_key,
-        search_key = search_key,
+        batch_delete_button = batch_delete_button,
+        search_ui = search_ui,
         th_cells = th_cells,
         colspan = colspan,
         td_cells = td_cells,
@@ -516,15 +864,22 @@ pub fn {component_name}() -> Element {{
 /// 生成 i18n TKey 变体列表
 pub fn gen_i18n_keys(config: &ModuleConfig, naming: &Naming) -> Vec<String> {
     let mut keys = vec![
-format!("{}Manage", naming.pascal_resource),
-format!("Add{}", naming.pascal_resource),
-format!("Edit{}", naming.pascal_resource),
-format!("Search{}Placeholder", naming.pascal_resource),
+        format!("{}Manage", naming.pascal_resource),
+        format!("Add{}", naming.pascal_resource),
+        format!("Edit{}", naming.pascal_resource),
+        format!("Search{}Placeholder", naming.pascal_resource),
     ];
+
+    // 批量删除的 TKey
+    if config.batch_delete {
+        keys.push("BatchDelete".to_string());
+    }
+
+    // 所有字段的 TKey (不管是否在 form/table 中显示, i18n 都需要)
     for field in &config.fields {
         let pascal = crate::naming::to_pascal(&field.name);
-keys.push(format!("{}{}", naming.pascal_resource, pascal));
-keys.push(format!("{}{}Placeholder", naming.pascal_resource, pascal));
+        keys.push(format!("{}{}", naming.pascal_resource, pascal));
+        keys.push(format!("{}{}Placeholder", naming.pascal_resource, pascal));
     }
     keys
 }
@@ -532,11 +887,16 @@ keys.push(format!("{}{}Placeholder", naming.pascal_resource, pascal));
 /// 生成中文翻译
 pub fn gen_i18n_zh(config: &ModuleConfig, naming: &Naming) -> Vec<(String, String)> {
     let mut pairs = vec![
-(format!("{}Manage", naming.pascal_resource), naming.module_cn.clone()),
-(format!("Add{}", naming.pascal_resource), format!("+ 新增{}", naming.resource)),
-(format!("Edit{}", naming.pascal_resource), format!("编辑{}", naming.resource)),
-(format!("Search{}Placeholder", naming.pascal_resource), format!("搜索{}", naming.module_cn.trim_end_matches("管理"))),
+        (format!("{}Manage", naming.pascal_resource), naming.module_cn.clone()),
+        (format!("Add{}", naming.pascal_resource), format!("+ 新增{}", naming.resource)),
+        (format!("Edit{}", naming.pascal_resource), format!("编辑{}", naming.resource)),
+        (format!("Search{}Placeholder", naming.pascal_resource), format!("搜索{}", naming.module_cn.trim_end_matches("管理"))),
     ];
+
+    if config.batch_delete {
+        pairs.push(("BatchDelete".to_string(), "批量删除".to_string()));
+    }
+
     for field in &config.fields {
         let pascal = crate::naming::to_pascal(&field.name);
         let label = if field.comment.is_empty() {
@@ -544,8 +904,8 @@ pub fn gen_i18n_zh(config: &ModuleConfig, naming: &Naming) -> Vec<(String, Strin
         } else {
             field.comment.clone()
         };
-pairs.push((format!("{}{}", naming.pascal_resource, pascal), label.clone()));
-pairs.push((format!("{}{}Placeholder", naming.pascal_resource, pascal), format!("请输入{}", label)));
+        pairs.push((format!("{}{}", naming.pascal_resource, pascal), label.clone()));
+        pairs.push((format!("{}{}Placeholder", naming.pascal_resource, pascal), format!("请输入{}", label)));
     }
     pairs
 }
@@ -560,14 +920,14 @@ pub fn gen_i18n_en(config: &ModuleConfig, naming: &Naming) -> Vec<(String, Strin
         (format!("Edit{}", pascal_en), format!("Edit {}", pascal_en)),
         (format!("Search{}Placeholder", pascal_en), format!("Search {}", pascal_en)),
     ];
+
+    if config.batch_delete {
+        pairs.push(("BatchDelete".to_string(), "Batch Delete".to_string()));
+    }
+
     for field in &config.fields {
         let pascal = crate::naming::to_pascal(&field.name);
-        let label = if field.comment.is_empty() {
-            crate::naming::to_pascal(&field.name)
-        } else {
-            // 将中文注释转为英文标签 (简单处理)
-            crate::naming::to_pascal(&field.name)
-        };
+        let label = crate::naming::to_pascal(&field.name);
         pairs.push((format!("{}{}", pascal_en, pascal), label.clone()));
         pairs.push((format!("{}{}Placeholder", pascal_en, pascal), format!("Enter {}", label.to_lowercase())));
     }

@@ -16,3 +16,4 @@ pub mod sys_role_btns;
 pub mod sys_role_menus;
 pub mod sys_user;
 pub mod sys_user_role;
+pub mod sys_generator_history;

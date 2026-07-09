@@ -47,6 +47,8 @@ impl MigrationTrait for Migration {
         //   7. 字典管理      (dictionary)    parent=0  sort=3
         //   8. 个人信息      (profile)       parent=0  sort=4
         //   9. 系统设置      (settings)      parent=0  sort=5
+        //  10. 代码生成器    (generator)       parent=0  sort=6  [父菜单]
+        //  11. 生成历史      (generator/history) parent=10 sort=1
         let insert = Query::insert()
             .into_table(SysMenu::Table)
             .columns([
@@ -206,6 +208,38 @@ impl MigrationTrait for Migration {
                 0.into(),
                 "系统设置".into(),
                 "setting".into(),
+                0.into(),
+            ])
+            .values_panic([
+                // ID=10: 代码生成器（父菜单）
+                0.into(),
+                0.into(),
+                "generator".into(),
+                "generator".into(),
+                0.into(),
+                "".into(),
+                6.into(),
+                "".into(),
+                0.into(),
+                0.into(),
+                "代码生成器".into(),
+                "tools".into(),
+                0.into(),
+            ])
+            .values_panic([
+                // ID=11: 生成历史（子菜单，parent=10）
+                0.into(),
+                10.into(),
+                "generator/history".into(),
+                "generatorHistory".into(),
+                0.into(),
+                "".into(),
+                1.into(),
+                "".into(),
+                0.into(),
+                0.into(),
+                "生成历史".into(),
+                "history".into(),
                 0.into(),
             ])
             .to_owned();

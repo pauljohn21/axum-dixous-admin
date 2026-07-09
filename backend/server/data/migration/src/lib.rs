@@ -14,6 +14,7 @@ mod m20240424_074636_create_sys_menu_role;
 mod m20250211_071223_create_sys_menu_domain;
 mod m20260701_000001_create_casbin_rule;
 mod m20260701_000002_create_jwt_blacklists;
+mod m20260708_000001_create_sys_generator_history;
 
 pub struct Migrator;
 
@@ -30,6 +31,7 @@ impl MigratorTrait for Migrator {
             Box::new(m20250211_071223_create_sys_menu_domain::Migration),
             Box::new(m20260701_000001_create_casbin_rule::Migration),
             Box::new(m20260701_000002_create_jwt_blacklists::Migration),
+            Box::new(m20260708_000001_create_sys_generator_history::Migration),
         ]
     }
 }
