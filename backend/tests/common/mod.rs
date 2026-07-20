@@ -94,6 +94,7 @@ pub async fn insert_test_user(db: &DatabaseConnection) -> (i32, String) {
 }
 
 /// 插入测试角色并返回 id
+#[allow(dead_code)]
 pub async fn insert_test_role(db: &DatabaseConnection) -> i32 {
     use model::dao::sys_role;
     use sea_orm::Set;
