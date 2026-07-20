@@ -331,6 +331,6 @@ impl GeneratorHistoryService {
             "fields": fields_json
         });
 
-        Ok(serde_json::to_string_pretty(&config).map_err(|e| ServiceError::BadRequest(e.to_string()))?)
+        serde_json::to_string_pretty(&config).map_err(|e| ServiceError::BadRequest(e.to_string()))
     }
 }

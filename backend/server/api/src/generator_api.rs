@@ -12,7 +12,7 @@ use axum::Router;
 use model::dao::sys_generator_history;
 use model::dto::page_dto::{PageRequest, PageResponse};
 use model::dto::sys_generator_history_dto::{
-    ColumnInfo, DatabaseInfo, GenerateFromTableDTO, GeneratedFile, GeneratorRollbackDTO,
+    ColumnInfo, DatabaseInfo, GenerateFromTableDTO, GeneratorRollbackDTO,
     PreviewCodeDTO, PreviewCodeResponse, SysGeneratorHistoryInsertDTO, SysGeneratorHistoryUpdateDTO, TableInfo,
 };
 use service::generator_code_service::GeneratorCodeService;

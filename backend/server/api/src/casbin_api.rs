@@ -114,7 +114,7 @@ pub async fn update_role_policies(State(state): State<AppState>, Path(role): Pat
         .collect();
 
     CasbinService::update_role_policies(&state.db, &state.enforcer, &role, policies)
-        .await?;;
+        .await?;
 
     Ok(R::ok(()))
 }

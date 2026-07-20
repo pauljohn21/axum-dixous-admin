@@ -97,18 +97,16 @@ pub async fn register(State(state): State<AppState>, Json(data): Json<SysUserIns
     tag = "用户管理"
 )]
 pub async fn logout(State(state): State<AppState>, req: Request) -> Result<impl IntoResponse, AppError> {
-    if let Some(auth_header) = req.headers().get(AUTHORIZATION).and_then(|v| v.to_str().ok()) {
-        if let Some(token) = auth_header.strip_prefix("Bearer ") {
-            // 将 token 加入 Redis 黑名单（TTL = JWT 过期时间）
-            let token_key = format!("jwt:blacklist:{}", token);
-            let expire_seconds = state.config.jwt.expire_hours as u64 * 3600;
-            let _ = redis::cmd("SETEX")
-                .arg(&token_key)
-                .arg(expire_seconds)
-                .arg("1")
-                .query_async::<()>(&mut state.redis.clone())
-                .await;
-        }
+    if let Some(token) = req.headers().get(AUTHORIZATION).and_then(|v| v.to_str().ok()).and_then(|h| h.strip_prefix("Bearer ")) {
+        // 将 token 加入 Redis 黑名单（TTL = JWT 过期时间）
+        let token_key = format!("jwt:blacklist:{}", token);
+        let expire_seconds = state.config.jwt.expire_hours as u64 * 3600;
+        let _ = redis::cmd("SETEX")
+            .arg(&token_key)
+            .arg(expire_seconds)
+            .arg("1")
+            .query_async::<()>(&mut state.redis.clone())
+            .await;
     }
     Ok(R::ok(()))
 }
