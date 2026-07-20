@@ -3,6 +3,7 @@
     "pages/login/login",
     "pages/dashboard/dashboard",
     "pages/users/users",
+    "pages/roles/roles",
     "pages/profile/profile"
   ],
   "window": {
@@ -24,6 +25,10 @@
       {
         "pagePath": "pages/users/users",
         "text": "用户"
+      },
+      {
+        "pagePath": "pages/roles/roles",
+        "text": "角色"
       },
       {
         "pagePath": "pages/profile/profile",
