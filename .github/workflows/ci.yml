@@ -67,6 +67,13 @@ jobs:
       - name: Build (release)
         run: cargo build --manifest-path backend/Cargo.toml --release
 
+      - name: Install cargo-audit
+        run: cargo install cargo-audit || true
+
+      - name: Audit dependencies
+        run: cargo audit --manifest-path backend/Cargo.toml --deny warnings
+        continue-on-error: true # 首次启用，暂不阻塞；后续收紧为必须通过
+
   # ===== 前端检查 =====
   frontend-check:
     runs-on: ubuntu-latest
