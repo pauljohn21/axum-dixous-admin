@@ -120,6 +120,7 @@ casbin = { workspace = true }
 reqwest = { workspace = true }
 serde_json = { workspace = true }
 http = { workspace = true }
+serial_test = "3"
 
 [profile.release]
 codegen-units = 1
