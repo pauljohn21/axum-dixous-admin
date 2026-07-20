@@ -1,5 +1,6 @@
 pub use crate::{
     auth::{create_token, verify_token, Claims},
+    cache::Cache,
     config::{CONFIG, WechatConfig},
     db::DB,
     error::{AppError, ServiceError},

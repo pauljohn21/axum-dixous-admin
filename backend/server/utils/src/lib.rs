@@ -5,6 +5,7 @@
 extern crate serde;
 
 mod auth;
+pub mod cache;
 mod config;
 mod db;
 mod error;
