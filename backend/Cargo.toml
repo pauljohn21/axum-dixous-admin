@@ -96,6 +96,7 @@ auth-layer = { workspace = true }
 tower-http = { workspace = true }
 service = { path = "server/service" }
 api = { path = "server/api" }
+reqwest = { workspace = true }
 serde = { workspace = true, features = ["derive"] }
 serde_json = { workspace = true }
 utoipa = { workspace = true }

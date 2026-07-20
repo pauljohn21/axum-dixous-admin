@@ -20,6 +20,8 @@ tower-http = { workspace = true }
 # service & api
 service = { path = "../service" }
 api = { path = "../api" }
+# HTTP 客户端
+reqwest = { workspace = true }
 # serde
 serde = { workspace = true, features = ["derive"] }
 serde_json = { workspace = true }
