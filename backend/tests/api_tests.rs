@@ -3,10 +3,13 @@
 //! 使用 Mock Service 验证 ServiceError → AppError 转换和配置加载。
 
 use async_trait::async_trait;
-use utils::prelude::{AppError, ServiceError, DashboardStats, UserService};
-use model::dao::sys_user;
+use utils::prelude::{AppError, ServiceError, DashboardStats, UserService, RoleService, MenuService, ApiService};
+use model::dao::{sys_user, sys_role, sys_menu, sys_apis};
 use model::dto::page_dto::{PageRequest, PageResponse};
 use model::dto::sys_user_dto::{LoginDTO, SysUserInsertDTO, SysUserUpdateDTO};
+use model::dto::sys_role_dto::{SysRoleInsertDTO, SysRoleUpdateDTO};
+use model::dto::sys_menu_dto::{SysMenuInsertDTO, SysMenuUpdateDTO};
+use model::dto::sys_api_dto::{SysApiInsertDTO, SysApiUpdateDTO};
 
 /// 构建测试用 sys_user::Model
 fn test_user() -> sys_user::Model {
@@ -173,4 +176,200 @@ async fn test_config_values() {
     assert_eq!(CONFIG.server.port, 8888);
     assert_eq!(CONFIG.datasource.database, "scm");
     assert_eq!(CONFIG.jwt.expire_hours, 24);
+}
+
+// ===== Mock RoleService =====
+
+fn test_role() -> sys_role::Model {
+    sys_role::Model {
+        id: 1,
+        en_name: Some("admin".into()),
+        cn_name: Some("管理员".into()),
+        parent_id: Some(0),
+        created_ad: None,
+        updated_ad: None,
+        deleted_ad: None,
+    }
+}
+
+struct MockRoleService;
+
+#[async_trait]
+impl RoleService for MockRoleService {
+    async fn insert(&self, _data: SysRoleInsertDTO) -> Result<sys_role::Model, ServiceError> {
+        Ok(test_role())
+    }
+    async fn list(&self, _query: PageRequest) -> Result<PageResponse<sys_role::Model>, ServiceError> {
+        Ok(PageResponse { list: vec![test_role()], total: 1, page: 1, page_size: 10 })
+    }
+    async fn get_by_id(&self, id: i32) -> Result<sys_role::Model, ServiceError> {
+        if id == 1 {
+            Ok(test_role())
+        } else {
+            Err(ServiceError::NotFound("角色不存在".into()))
+        }
+    }
+    async fn update(&self, _id: i32, _data: SysRoleUpdateDTO) -> Result<sys_role::Model, ServiceError> {
+        Ok(test_role())
+    }
+    async fn delete(&self, _id: i32) -> Result<(), ServiceError> { Ok(()) }
+}
+
+#[tokio::test]
+async fn test_mock_role_service_crud() {
+    let svc = MockRoleService;
+
+    // insert
+    let role = svc.insert(SysRoleInsertDTO {
+        en_name: "admin".into(),
+        cn_name: "管理员".into(),
+        parent_id: Some(0),
+    }).await.unwrap();
+    assert_eq!(role.en_name, Some("admin".into()));
+
+    // get_by_id
+    let found = svc.get_by_id(1).await.unwrap();
+    assert_eq!(found.cn_name, Some("管理员".into()));
+
+    // get_by_id not found
+    assert!(svc.get_by_id(999).await.is_err());
+
+    // list
+    let list = svc.list(PageRequest { page: Some(1), page_size: Some(10), keyword: None }).await.unwrap();
+    assert_eq!(list.total, 1);
+
+    // delete
+    assert!(svc.delete(1).await.is_ok());
+}
+
+// ===== Mock MenuService =====
+
+fn test_menu() -> sys_menu::Model {
+    sys_menu::Model {
+        id: 1,
+        menu_level: Some(0),
+        parent_id: Some(0),
+        path: Some("/dashboard".into()),
+        name: Some("dashboard".into()),
+        hidden: Some(0),
+        component: Some("Dashboard".into()),
+        sort: Some(0),
+        active_name: None,
+        keep_alive: Some(0),
+        default_menu: Some(0),
+        title: Some("仪表盘".into()),
+        icon: Some("dashboard".into()),
+        close_tab: Some(0),
+        created_ad: None,
+        updated_ad: None,
+        deleted_ad: None,
+    }
+}
+
+struct MockMenuService;
+
+#[async_trait]
+impl MenuService for MockMenuService {
+    async fn insert(&self, _data: SysMenuInsertDTO) -> Result<sys_menu::Model, ServiceError> {
+        Ok(test_menu())
+    }
+    async fn list(&self, _query: PageRequest) -> Result<PageResponse<sys_menu::Model>, ServiceError> {
+        Ok(PageResponse { list: vec![test_menu()], total: 1, page: 1, page_size: 10 })
+    }
+    async fn get_by_id(&self, id: i32) -> Result<sys_menu::Model, ServiceError> {
+        if id == 1 { Ok(test_menu()) } else { Err(ServiceError::NotFound("菜单不存在".into())) }
+    }
+    async fn update(&self, _id: i32, _data: SysMenuUpdateDTO) -> Result<sys_menu::Model, ServiceError> {
+        Ok(test_menu())
+    }
+    async fn delete(&self, _id: i32) -> Result<(), ServiceError> { Ok(()) }
+    async fn get_menus_by_username(&self, _username: &str) -> Result<Vec<sys_menu::Model>, ServiceError> {
+        Ok(vec![test_menu()])
+    }
+}
+
+#[tokio::test]
+async fn test_mock_menu_service_crud() {
+    let svc = MockMenuService;
+
+    let menu = svc.insert(SysMenuInsertDTO {
+        menu_level: Some(0),
+        parent_id: Some(0),
+        path: Some("/dashboard".into()),
+        name: Some("dashboard".into()),
+        hidden: Some(0),
+        component: Some("Dashboard".into()),
+        sort: Some(0),
+        active_name: None,
+        keep_alive: Some(0),
+        default_menu: Some(0),
+        title: Some("仪表盘".into()),
+        icon: Some("dashboard".into()),
+        close_tab: Some(0),
+    }).await.unwrap();
+    assert_eq!(menu.path, Some("/dashboard".into()));
+
+    assert!(svc.get_by_id(1).await.is_ok());
+    assert!(svc.get_by_id(999).await.is_err());
+
+    let menus = svc.get_menus_by_username("admin").await.unwrap();
+    assert_eq!(menus.len(), 1);
+
+    let list = svc.list(PageRequest { page: Some(1), page_size: Some(10), keyword: None }).await.unwrap();
+    assert_eq!(list.total, 1);
+}
+
+// ===== Mock ApiService =====
+
+fn test_api() -> sys_apis::Model {
+    sys_apis::Model {
+        id: 1,
+        created_at: None,
+        updated_at: None,
+        deleted_at: None,
+        path: Some("/api/user".into()),
+        description: Some("用户列表".into()),
+        api_group: Some("用户管理".into()),
+        method: Some("GET".into()),
+    }
+}
+
+struct MockApiService;
+
+#[async_trait]
+impl ApiService for MockApiService {
+    async fn insert(&self, _data: SysApiInsertDTO) -> Result<sys_apis::Model, ServiceError> {
+        Ok(test_api())
+    }
+    async fn list(&self, _query: PageRequest) -> Result<PageResponse<sys_apis::Model>, ServiceError> {
+        Ok(PageResponse { list: vec![test_api()], total: 1, page: 1, page_size: 10 })
+    }
+    async fn get_by_id(&self, id: i64) -> Result<sys_apis::Model, ServiceError> {
+        if id == 1 { Ok(test_api()) } else { Err(ServiceError::NotFound("API不存在".into())) }
+    }
+    async fn update(&self, _id: i64, _data: SysApiUpdateDTO) -> Result<sys_apis::Model, ServiceError> {
+        Ok(test_api())
+    }
+    async fn delete(&self, _id: i64) -> Result<(), ServiceError> { Ok(()) }
+}
+
+#[tokio::test]
+async fn test_mock_api_service_crud() {
+    let svc = MockApiService;
+
+    let api = svc.insert(SysApiInsertDTO {
+        path: Some("/api/user".into()),
+        description: Some("用户列表".into()),
+        api_group: Some("用户管理".into()),
+        method: Some("GET".into()),
+    }).await.unwrap();
+    assert_eq!(api.path, Some("/api/user".into()));
+
+    assert!(svc.get_by_id(1).await.is_ok());
+    assert!(svc.get_by_id(999).await.is_err());
+
+    let list = svc.list(PageRequest { page: Some(1), page_size: Some(10), keyword: None }).await.unwrap();
+    assert_eq!(list.total, 1);
+
+    assert!(svc.delete(1).await.is_ok());
 }
