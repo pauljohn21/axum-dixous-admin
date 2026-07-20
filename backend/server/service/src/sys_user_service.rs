@@ -261,12 +261,14 @@ impl SysUserService {
         resp.openid.ok_or_else(|| ServiceError::WechatApi("openid 为空".into()))
     }
 
-    /// 仪表盘统计数据
+    /// 仪表盘统计数据 — 并行查询 4 个 count
     pub async fn dashboard_stats(db: &DatabaseConnection) -> Result<crate::DashboardStats, ServiceError> {
-        let user_count = SysUser::find().count(db).await?;
-        let role_count = model::prelude::SysRole::find().count(db).await?;
-        let menu_count = model::prelude::SysMenu::find().count(db).await?;
-        let api_count = model::prelude::SysApis::find().count(db).await?;
+        let (user_count, role_count, menu_count, api_count) = tokio::try_join!(
+            SysUser::find().count(db),
+            model::prelude::SysRole::find().count(db),
+            model::prelude::SysMenu::find().count(db),
+            model::prelude::SysApis::find().count(db),
+        )?;
         Ok(crate::DashboardStats {
             user_count,
             role_count,
