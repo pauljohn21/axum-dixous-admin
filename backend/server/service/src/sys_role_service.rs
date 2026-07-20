@@ -88,11 +88,17 @@ impl SysRoleService {
             .exec(&txn)
             .await?;
 
-        // 清理 Casbin 策略中该角色的权限
+        // 清理 Casbin 策略中该角色的权限（所有域）
         use model::dao::casbin_rule;
         casbin_rule::Entity::delete_many()
             .filter(casbin_rule::Column::Ptype.eq("p"))
             .filter(casbin_rule::Column::V0.eq(id.to_string()))
+            .exec(&txn)
+            .await?;
+        // 清理角色绑定（所有域）
+        casbin_rule::Entity::delete_many()
+            .filter(casbin_rule::Column::Ptype.eq("g"))
+            .filter(casbin_rule::Column::V1.eq(id.to_string()))
             .exec(&txn)
             .await?;
 
