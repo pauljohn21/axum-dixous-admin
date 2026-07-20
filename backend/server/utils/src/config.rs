@@ -69,6 +69,11 @@ impl Config {
             config.wechat.secret = v;
         }
 
+        // JWT 密钥为空时使用开发环境默认值（生产环境必须通过 ADMIN_JWT_SECRET 设置）
+        if config.jwt.secret.is_empty() {
+            config.jwt.secret = "dev-only-secret-not-for-production".to_string();
+        }
+
         config
     }
 }

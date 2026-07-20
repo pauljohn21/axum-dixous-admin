@@ -14,8 +14,53 @@ use crate::sys_user_role_service::SysUserRoleService;
 
 pub struct SysUserService;
 
+/// 用户名校验: 3-20 字符，仅字母数字下划线
+fn validate_username(username: &str) -> Result<(), ServiceError> {
+    if username.len() < 3 || username.len() > 20 {
+        return Err(ServiceError::BadRequest("用户名长度需 3-20 字符".into()));
+    }
+    if !username.chars().all(|c| c.is_alphanumeric() || c == '_') {
+        return Err(ServiceError::BadRequest("用户名仅允许字母数字下划线".into()));
+    }
+    Ok(())
+}
+
+/// 密码校验: 最少 6 位
+fn validate_password(password: &str) -> Result<(), ServiceError> {
+    if password.len() < 6 {
+        return Err(ServiceError::BadRequest("密码至少 6 位".into()));
+    }
+    Ok(())
+}
+
+/// 邮箱校验: 基本格式（含 @）
+fn validate_email(email: &str) -> Result<(), ServiceError> {
+    if !email.is_empty() && (!email.contains('@') || !email.contains('.')) {
+        return Err(ServiceError::BadRequest("邮箱格式不正确".into()));
+    }
+    Ok(())
+}
+
+/// 手机号校验: 11 位数字（中国手机号）
+fn validate_phone(phone: &str) -> Result<(), ServiceError> {
+    if !phone.is_empty() && (phone.len() != 11 || !phone.chars().all(|c| c.is_ascii_digit())) {
+        return Err(ServiceError::BadRequest("手机号格式不正确".into()));
+    }
+    Ok(())
+}
+
 impl SysUserService {
     pub async fn insert(db: &DatabaseConnection, data: SysUserInsertDTO) -> Result<(), ServiceError> {
+        // 输入校验
+        validate_username(&data.username)?;
+        validate_password(&data.password)?;
+        if let Some(ref email) = data.email {
+            validate_email(email)?;
+        }
+        if let Some(ref phone) = data.phone {
+            validate_phone(phone)?;
+        }
+
         let txn = db.begin().await?;
         let hash = PasswordUtils::encrypt(&data.password);
 
@@ -43,6 +88,10 @@ impl SysUserService {
     }
 
     pub async fn login(db: &DatabaseConnection, data: LoginDTO) -> Result<sys_user::Model, ServiceError> {
+        // 输入校验
+        validate_username(&data.username)?;
+        validate_password(&data.password)?;
+
         let user = SysUser::find()
             .filter(sys_user::Column::Username.eq(data.username.as_str()))
             .one(db)

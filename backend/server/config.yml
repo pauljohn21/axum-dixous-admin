@@ -27,7 +27,7 @@ cache:
 logger:
   level: info
 jwt:
-  secret: "your-256-bit-secret-key-change-in-production"
+  secret: ""  # 通过 ADMIN_JWT_SECRET 环境变量设置，此处留空
   expire_hours: 24
 # 微信小程序配置
 wechat:
