@@ -66,13 +66,17 @@ axum-dixous-admin/
 | 后端 Web 框架 | Axum | 0.8 |
 | ORM | SeaORM | 1 |
 | 数据库 | MySQL | 8 |
-| 缓存 | Redis | 7 |
+| 缓存 | Redis | 7 (JWT 黑名单 + 热点缓存) |
 | 权限 | Casbin | 2 (RBAC, keyMatch2) |
 | JWT | jsonwebtoken | 9 |
 | API 文档 | utoipa + Swagger UI | 5 / 9 |
+| 中间件 | tower-http | 0.6 (CORS + Compression + Timeout + Trace) |
+| HTTP 客户端 (后端) | reqwest | 0.12 (AppState 单例复用) |
+| HTTP 客户端 (前端) | gloo-net | 0.7 |
+| 错误处理 | thiserror | 2 (ServiceError + AppError) |
+| Service 抽象 | async-trait | 0.1 (Trait + Mock 测试) |
 | 前端框架 | Dioxus | 0.7 |
 | UI 组件 | dioxus-element-plug | 0.3 |
-| HTTP 客户端 | gloo-net | 0.7 |
 | 前端路由守卫 | route-guard (本地 crate) | - |
 | 微信小程序 | TypeScript + WXML/WXSS | 原生 |
 | Rust edition | 2024 | rust-version 1.96 |
@@ -114,17 +118,45 @@ dx serve                    # 默认 web 平台，热重载
 ### 分层结构
 
 ```
-gateway (main.rs)           → 启动入口，组装路由和中间件
-  ├── api (HTTP 层)          → 路由定义 + OpenAPI 注解 + 请求处理
-  ├── service (业务层)        → 业务逻辑，调用 model + utils
+gateway (main.rs)           → 启动入口，组装 AppState + 路由 + 中间件链 + 优雅关闭
+  ├── api (HTTP 层)          → 路由定义 + OpenAPI 注解 + 请求处理 (State<AppState> 注入)
+  ├── service (业务层)        → 业务逻辑，参数注入 &DatabaseConnection，返回 Result<_, ServiceError>
+  │   └── impls.rs          → Service Trait 实现 (UserServiceImpl, RoleServiceImpl 等)
   ├── model (数据层)
   │   ├── dao/              → SeaORM 实体 (由 sea-orm-cli 生成)
   │   └── dto/              → 请求/响应数据传输对象
-  ├── auth-layer (中间件)     → JWT 验证 + Casbin enforce
+  ├── auth-layer (中间件)     → JWT 验证 (Redis 黑名单 O(1)) + Casbin enforce
   ├── casbin-adapter         → SeaORM 实现的 Casbin Adapter
   ├── migration (迁移)        → SeaORM 迁移脚本
-  └── utils (工具)           → 配置、DB 连接、JWT、密码、日志
+  └── utils (工具)
+      ├── config.rs         → 配置加载 + 环境变量覆盖 (ADMIN_{SECTION}_{FIELD})
+      ├── state.rs          → AppState 共享状态 (db + enforcer + http_client + config + redis)
+      ├── error.rs          → AppError (HTTP 层) + ServiceError (领域层)
+      ├── traits.rs         → Service Trait 定义 (UserService, RoleService, MenuService, ApiService)
+      ├── db.rs             → DB 连接池 + Redis 连接管理器 (OnceCell 单例)
+      ├── auth.rs           → JWT 创建/验证
+      ├── password_utils.rs → Argon2 密码加密
+      └── level.rs          → 日志初始化
 ```
+
+### 应用共享状态 (AppState)
+
+所有 handler 通过 `State<AppState>` 提取共享状态，实现依赖注入：
+
+```rust
+#[derive(Clone)]
+pub struct AppState {
+    pub db: DatabaseConnection,              // 数据库连接池
+    pub enforcer: Arc<RwLock<CachedEnforcer>>, // Casbin 权限执行器
+    pub http_client: reqwest::Client,        // HTTP 客户端单例 (复用连接池)
+    pub config: Config,                      // 应用配置
+    pub redis: redis::aio::ConnectionManager, // Redis 连接管理器 (自动重连)
+}
+```
+
+- 在 `gateway/main.rs` 中初始化，通过 `.with_state(state)` 注入路由
+- `public_routes()` 和 `protected_routes()` 返回 `Router<AppState>`
+- Service 层函数接收 `db: &DatabaseConnection` 参数（从 `state.db` 传入）
 
 ### 关键约定
 
@@ -133,12 +165,34 @@ gateway (main.rs)           → 启动入口，组装路由和中间件
 - 配置文件: `backend/server/config.yml`
 - 通过 `include_str!` 在编译期内嵌，运行时用 `once_cell::Lazy` 全局持有
 - 访问方式: `utils::prelude::CONFIG.datasource.host`
-- **Docker 构建注意**: `config.yml` 中的 `localhost` 需在 Dockerfile 中用 `sed` 替换为 Docker 服务名 (`mysql`/`redis`)
+- **环境变量覆盖**: 加载 `config.yml` 后，用环境变量覆盖关键字段（命名规范 `ADMIN_{SECTION}_{FIELD}`）
+
+| 环境变量 | 覆盖字段 | 说明 |
+|----------|----------|------|
+| `ADMIN_SERVER_HOST` | `server.host` | 服务监听地址 |
+| `ADMIN_SERVER_PORT` | `server.port` | 服务监听端口 |
+| `ADMIN_DB_HOST` | `datasource.host` | MySQL 主机 |
+| `ADMIN_DB_PORT` | `datasource.port` | MySQL 端口 |
+| `ADMIN_DB_DATABASE` | `datasource.database` | 数据库名 |
+| `ADMIN_DB_USERNAME` | `datasource.username` | 数据库用户名 |
+| `ADMIN_DB_PASSWORD` | `datasource.password` | 数据库密码 |
+| `ADMIN_REDIS_HOST` | `cache.host` | Redis 主机 |
+| `ADMIN_REDIS_PORT` | `cache.port` | Redis 端口 |
+| `ADMIN_REDIS_PASSWORD` | `cache.password` | Redis 密码 |
+| `ADMIN_JWT_SECRET` | `jwt.secret` | JWT 密钥 |
+| `ADMIN_JWT_EXPIRE_HOURS` | `jwt.expire_hours` | JWT 过期时间 |
+| `ADMIN_WECHAT_APPID` | `wechat.appid` | 微信 AppID |
+| `ADMIN_WECHAT_SECRET` | `wechat.secret` | 微信 Secret |
+
+- **Docker 部署**: 可通过 `ENV` 环境变量覆盖，无需 `sed` 替换 `config.yml`（当前 Dockerfile 仍保留 `sed` 方式，两种方式均可）
 
 #### 数据库连接
 
-- 使用 `db_conn!()` 宏获取连接: `let db = db_conn!();`
-- 宏展开为 `&utils::prelude::DB::db_connection().await`
+- **推荐方式**: 通过 `State<AppState>` 注入，handler 内使用 `&state.db`
+- **旧方式** (过渡保留): `db_conn!()` 宏获取全局连接 — `let db = db_conn!();`
+- 宏展开为 `utils::prelude::DB::db_connection().await`
+- **Redis 连接**: `DB::redis_connection().await` 获取 `&'static ConnectionManager`，或通过 `state.redis` 访问
+- Service 层函数签名: `pub async fn xxx(db: &DatabaseConnection, ...) -> Result<T, ServiceError>`
 
 #### 统一响应
 
@@ -151,13 +205,45 @@ gateway (main.rs)           → 启动入口，组装路由和中间件
 - 请求: `PageRequest { page, page_size, keyword }` (均为 Option)
 - 响应: `PageResponse<T> { list, total, page, page_size }`
 
+#### 错误处理
+
+- **Service 层**: 返回 `Result<T, ServiceError>`（领域错误类型，定义在 `utils/src/error.rs`）
+  - `ServiceError::NotFound(String)` — 资源不存在
+  - `ServiceError::Auth(String)` — 认证失败
+  - `ServiceError::Forbidden(String)` — 权限不足
+  - `ServiceError::BadRequest(String)` — 参数错误
+  - `ServiceError::UserNotFound` / `InvalidPassword` / `WechatAlreadyBound` / `WechatApi` — 用户领域特定
+  - `ServiceError::Db(DbErr)` / `Jwt` / `Http` — 基础设施错误
+- **API 层**: 返回 `Result<impl IntoResponse, AppError>`，`ServiceError` 自动转换为 `AppError`
+  - `AppError` 实现 `IntoResponse`，自动映射 HTTP 状态码 (401/403/404/500)
+  - API handler 中用 `?` 操作符传播错误: `let result = SysXxxService::xxx(&state.db, data).await?;`
+
 #### 鉴权流程
 
 1. 登录: `POST /api/user/login` → 返回 JWT token
 2. 受保护路由: `AuthLayer` 中间件拦截
    - 验证 JWT → 提取 `Username` 注入 request extension
+   - **JWT 黑名单检查**: Redis `EXISTS jwt:blacklist:{token}` O(1) 查询
    - Casbin enforce(sub=user, obj=path, act=method) → 通过/拒绝
-3. 前端: `Authorization: Bearer {token}` 请求头
+3. 登出: `POST /api/user/logout` → 将 token 写入 Redis 黑名单 (SETEX，TTL = JWT 过期时间)
+4. 前端: `Authorization: Bearer {token}` 请求头
+
+#### 中间件链
+
+`gateway/main.rs` 中从内到外依次应用：
+
+| 中间件 | 作用 |
+|--------|------|
+| `AuthLayer` | JWT 验证 + Redis 黑名单 + Casbin 鉴权 (仅 protected_routes) |
+| `CompressionLayer` | 响应 gzip 压缩 |
+| `TimeoutLayer` | 请求超时 30s → 408 |
+| `TraceLayer` | 请求链路追踪 (tracing)
+| `CorsLayer` | CORS (very_permissive) |
+
+#### 优雅关闭
+
+- `Ctrl+C` 或 `SIGTERM` 触发优雅关闭
+- 当前请求处理完成后退出，日志打印 "收到关闭信号，正在优雅关闭..."
 
 #### API 路由规范
 
@@ -178,9 +264,33 @@ gateway (main.rs)           → 启动入口，组装路由和中间件
 2. 生成实体: 运行 `gen_entity.sh` (或手动在 `model/src/dao/` 创建)
 3. 创建 DTO: 在 `model/src/dto/` 添加 `xxx_dto.rs`
 4. 创建 Service: 在 `service/src/` 添加 `xxx_service.rs`
+   - 函数签名: `pub async fn xxx(db: &DatabaseConnection, ...) -> Result<T, ServiceError>`
+   - 错误返回: `ServiceError::NotFound("xxx不存在".into())` 等
 5. 创建 API: 在 `api/src/` 添加 `xxx_api.rs`，注册路由和 OpenAPI
+   - Handler 签名: `pub async fn create(State(state): State<AppState>, Json(data): Json<...>) -> Result<impl IntoResponse, AppError>`
+   - Service 调用: `SysXxxService::insert(&state.db, data).await?`
+   - 路由返回: `Router<AppState>`
 6. 注册模块: 在各 `lib.rs` 中 `pub mod xxx;`
 7. 合并路由: 在 `api/src/lib.rs` 的 `protected_routes()` 中 `.merge(xxx_api::routes())`
+
+**Service 层示例:**
+```rust
+pub struct SysXxxService;
+impl SysXxxService {
+    pub async fn get_by_id(db: &DatabaseConnection, id: i32) -> Result<sys_xxx::Model, ServiceError> {
+        SysXxx::find_by_id(id).one(db).await?
+            .ok_or_else(|| ServiceError::NotFound("xxx不存在".into()))
+    }
+}
+```
+
+**API 层示例:**
+```rust
+pub async fn get_by_id(State(state): State<AppState>, Path(id): Path<i32>) -> Result<impl IntoResponse, AppError> {
+    let result = SysXxxService::get_by_id(&state.db, id).await?;
+    Ok(R::ok(result))
+}
+```
 
 ## 前端架构
 
@@ -291,8 +401,11 @@ cd web && dx build --release && docker compose up -d
 - 两阶段构建: `rust:1.96-slim-bookworm` (builder) → `debian:bookworm-slim` (runtime)
 - 依赖缓存: 先拷 `.cargo/` + 各 `Cargo.toml`，创建占位源码编译依赖，再拷真实源码
 - 国内加速: `.cargo/config.toml` (rsproxy.cn) + `SWAGGER_UI_DOWNLOAD_URL` (gh-proxy.com)
-- config.yml 替换: `sed` 将 `localhost` → `mysql`/`redis` (Docker 服务名)
+- config.yml 替换: 当前用 `sed` 将 `localhost` → `mysql`/`redis`；也支持通过 `ENV` 环境变量覆盖 (如 `ENV ADMIN_DB_HOST=mysql`)
+- 中间件: CompressionLayer (gzip) + TimeoutLayer (30s) + TraceLayer + CorsLayer
+- 优雅关闭: 支持 `SIGTERM` 信号
 - 运行时: 非 root 用户 (`app`) + 健康检查 (`/health`)
+- **注意**: Redis 现已启用 (JWT 黑名单)，容器需能访问 Redis 服务
 
 ### 前端构建要点
 
@@ -325,7 +438,7 @@ cd web && dx build --release && docker compose up -d
 - 后端: 中文注释，模块级 `//!` 文档注释
 - 前端: 中文注释，组件使用 `#[component]` 宏
 - 微信小程序: TypeScript，中文注释
-- 错误处理: 后端用 `anyhow::Result` + `AppError`，前端用 `Result<T, String>`
+- 错误处理: 后端 Service 层用 `Result<T, ServiceError>`，API 层用 `Result<impl IntoResponse, AppError>`（`ServiceError` 自动转换），前端用 `Result<T, String>`
 - 序列化: 后端 `serde` derive，前端 `serde` + `serde_json`
 - 命名: 后端 snake_case，组件 PascalCase，小程序 camelCase
 - CSS 颜色: 必须使用 `var(--el-xxx)` CSS 变量，禁止硬编码 hex 值

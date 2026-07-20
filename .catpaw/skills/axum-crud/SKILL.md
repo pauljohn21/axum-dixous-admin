@@ -101,30 +101,27 @@ pub struct SysXxxQueryDTO {
 Create `service/src/sys_xxx_service.rs`:
 
 ```rust
-use anyhow::{anyhow, Result};
-use sea_orm::{ActiveModelTrait, ColumnTrait, EntityTrait, PaginatorTrait, QueryFilter, QuerySelect, Set};
+use sea_orm::{ActiveModelTrait, ColumnTrait, DatabaseConnection, EntityTrait, PaginatorTrait, QueryFilter, QuerySelect, Set};
 
 use model::dao::sys_xxx;
 use model::dto::page_dto::{PageRequest, PageResponse};
 use model::dto::sys_xxx_dto::{SysXxxInsertDTO, SysXxxUpdateDTO};
 use model::prelude::SysXxx;
-use utils::db_conn;
+use utils::prelude::ServiceError;
 
 pub struct SysXxxService;
 
 impl SysXxxService {
-    pub async fn insert(data: SysXxxInsertDTO) -> Result<sys_xxx::Model> {
-        let db = db_conn!();
+    pub async fn insert(db: &DatabaseConnection, data: SysXxxInsertDTO) -> Result<sys_xxx::Model, ServiceError> {
         let active = sys_xxx::ActiveModel {
             name: Set(data.name),
             ..Default::default()
         };
         let result = SysXxx::insert(active).exec(db).await?;
-        Self::get_by_id(result.last_insert_id).await
+        Self::get_by_id(db, result.last_insert_id).await
     }
 
-    pub async fn list(query: PageRequest) -> Result<PageResponse<sys_xxx::Model>> {
-        let db = db_conn!();
+    pub async fn list(db: &DatabaseConnection, query: PageRequest) -> Result<PageResponse<sys_xxx::Model>, ServiceError> {
         let page = query.page.unwrap_or(1);
         let page_size = query.page_size.unwrap_or(10);
         let mut q = SysXxx::find();
@@ -139,35 +136,36 @@ impl SysXxxService {
         Ok(PageResponse { list, total, page, page_size })
     }
 
-    pub async fn get_by_id(id: u64) -> Result<sys_xxx::Model> {
-        SysXxx::find_by_id(id).one(db_conn!()).await?
-            .ok_or_else(|| anyhow!("xxx不存在"))
+    pub async fn get_by_id(db: &DatabaseConnection, id: u64) -> Result<sys_xxx::Model, ServiceError> {
+        SysXxx::find_by_id(id).one(db).await?
+            .ok_or_else(|| ServiceError::NotFound("xxx不存在".into()))
     }
 
-    pub async fn update(id: u64, data: SysXxxUpdateDTO) -> Result<sys_xxx::Model> {
-        let db = db_conn!();
+    pub async fn update(db: &DatabaseConnection, id: u64, data: SysXxxUpdateDTO) -> Result<sys_xxx::Model, ServiceError> {
         let model: sys_xxx::ActiveModel = SysXxx::find_by_id(id).one(db).await?
-            .ok_or_else(|| anyhow!("xxx不存在"))?.into();
+            .ok_or_else(|| ServiceError::NotFound("xxx不存在".into()))?.into();
         let mut updated = model;
         if let Some(v) = data.name { updated.name = Set(Some(v)); }
         Ok(updated.update(db).await?)
     }
 
-    pub async fn delete(id: u64) -> Result<()> {
-        SysXxx::delete_by_id(id).exec(db_conn!()).await?;
+    pub async fn delete(db: &DatabaseConnection, id: u64) -> Result<(), ServiceError> {
+        SysXxx::delete_by_id(id).exec(db).await?;
         Ok(())
     }
 }
 ```
 
 - Register in `service/src/lib.rs`: `pub mod sys_xxx_service;`
+- **关键变化**: 函数第一个参数为 `db: &DatabaseConnection`，返回 `Result<T, ServiceError>`（不再用 `anyhow::Result`）
+- **错误返回**: 使用 `ServiceError::NotFound("xxx不存在".into())` 等领域错误类型
 
 ### Step 5: Backend API
 
 Create `api/src/xxx_api.rs` with 5 endpoints + `routes()` function:
 
 ```rust
-use axum::extract::{Path, Query};
+use axum::extract::{Path, Query, State};
 use axum::response::IntoResponse;
 use axum::Json;
 use axum::routing::{get, post};
@@ -176,35 +174,35 @@ use model::dao::sys_xxx;
 use model::dto::page_dto::{PageRequest, PageResponse};
 use model::dto::sys_xxx_dto::{SysXxxInsertDTO, SysXxxUpdateDTO};
 use service::sys_xxx_service::SysXxxService;
-use utils::prelude::{AppError, R};
+use utils::prelude::{AppError, R, AppState};
 
 #[utoipa::path(post, path = "/api/xxx", request_body = SysXxxInsertDTO, responses((status = 200, body = R<sys_xxx::Model>)), tag = "xxx管理")]
-pub async fn create(Json(data): Json<SysXxxInsertDTO>) -> Result<impl IntoResponse, AppError> {
-    Ok(R::ok(SysXxxService::insert(data).await.map_err(AppError::Anyhow)?))
+pub async fn create(State(state): State<AppState>, Json(data): Json<SysXxxInsertDTO>) -> Result<impl IntoResponse, AppError> {
+    Ok(R::ok(SysXxxService::insert(&state.db, data).await?))
 }
 
 #[utoipa::path(get, path = "/api/xxx/list", params(("page" = Option<u64>, Query), ("page_size" = Option<u64>, Query)), responses((status = 200, body = R<PageResponse<sys_xxx::Model>>)), tag = "xxx管理")]
-pub async fn list(Query(query): Query<PageRequest>) -> Result<impl IntoResponse, AppError> {
-    Ok(R::ok(SysXxxService::list(query).await.map_err(AppError::Anyhow)?))
+pub async fn list(State(state): State<AppState>, Query(query): Query<PageRequest>) -> Result<impl IntoResponse, AppError> {
+    Ok(R::ok(SysXxxService::list(&state.db, query).await?))
 }
 
 #[utoipa::path(get, path = "/api/xxx/{id}", params(("id" = u64, Path)), responses((status = 200, body = R<sys_xxx::Model>)), tag = "xxx管理")]
-pub async fn get_by_id(Path(id): Path<u64>) -> Result<impl IntoResponse, AppError> {
-    Ok(R::ok(SysXxxService::get_by_id(id).await.map_err(|e| AppError::NotFoundError(e.to_string()))?))
+pub async fn get_by_id(State(state): State<AppState>, Path(id): Path<u64>) -> Result<impl IntoResponse, AppError> {
+    Ok(R::ok(SysXxxService::get_by_id(&state.db, id).await?))
 }
 
 #[utoipa::path(put, path = "/api/xxx/{id}", params(("id" = u64, Path)), request_body = SysXxxUpdateDTO, responses((status = 200, body = R<sys_xxx::Model>)), tag = "xxx管理")]
-pub async fn update(Path(id): Path<u64>, Json(data): Json<SysXxxUpdateDTO>) -> Result<impl IntoResponse, AppError> {
-    Ok(R::ok(SysXxxService::update(id, data).await.map_err(AppError::Anyhow)?))
+pub async fn update(State(state): State<AppState>, Path(id): Path<u64>, Json(data): Json<SysXxxUpdateDTO>) -> Result<impl IntoResponse, AppError> {
+    Ok(R::ok(SysXxxService::update(&state.db, id, data).await?))
 }
 
 #[utoipa::path(delete, path = "/api/xxx/{id}", params(("id" = u64, Path)), responses((status = 200, body = R<serde_json::Value>)), tag = "xxx管理")]
-pub async fn delete_xxx(Path(id): Path<u64>) -> Result<impl IntoResponse, AppError> {
-    SysXxxService::delete(id).await.map_err(AppError::Anyhow)?;
+pub async fn delete_xxx(State(state): State<AppState>, Path(id): Path<u64>) -> Result<impl IntoResponse, AppError> {
+    SysXxxService::delete(&state.db, id).await?;
     Ok(R::ok(()))
 }
 
-pub fn routes() -> Router {
+pub fn routes() -> Router<AppState> {
     Router::new()
         .route("/api/xxx", post(create))
         .route("/api/xxx/list", get(list))
@@ -217,6 +215,11 @@ pub fn routes() -> Router {
 2. Add all 5 paths to `paths(...)` in `#[openapi(...)]`
 3. Add `xxx_api::routes()` to `protected_routes()` via `.merge()`
 4. Add tag `(name = "xxx管理", description = "xxx CRUD")`
+
+**关键变化:**
+- Handler 提取 `State<AppState>`，通过 `&state.db` 传递数据库连接
+- 错误处理用 `?` 操作符，`ServiceError` 自动转换为 `AppError`
+- 路由返回类型为 `Router<AppState>`
 
 ### Step 6: Frontend Model
 
@@ -383,7 +386,7 @@ Or add to the menu migration's `values_panic` section.
 |---|---|
 | Table naming | `sys_xxx` (snake_case, sys_ prefix) |
 | DAO Entity alias | `SysXxx` (PascalCase in prelude.rs) |
-| Service struct | `SysXxxService` with static methods |
+| Service struct | `SysXxxService` with static methods, first param `db: &DatabaseConnection` |
 | API tag | Chinese name + "管理" (e.g. "字典管理") |
 | API path | `/api/xxx` (singular resource name) |
 | Response wrapper | `R<T>` with `{ code: 200, message, data }` |
@@ -391,7 +394,7 @@ Or add to the menu migration's `values_panic` section.
 | HTTP functions | `post_void`/`delete_void` for null data, `post`/`delete` for model data |
 | CSS colors | Always `var(--el-xxx)` — never hardcoded hex |
 | Comments | Chinese comments throughout |
-| Error handling | Backend: `anyhow::Result` + `AppError`; Frontend: `Result<T, String>` |
+| Error handling | Backend Service: `Result<T, ServiceError>`; Backend API: `Result<impl IntoResponse, AppError>` (auto-convert); Frontend: `Result<T, String>` |
 
 ## Verification
 

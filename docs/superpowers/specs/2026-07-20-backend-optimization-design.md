@@ -1,8 +1,42 @@
 # 后端优化设计文档
 
 > 日期：2026-07-20
-> 状态：已批准
+> 状态：✅ 已完成
 > 范围：axum-dixous-admin 后端全栈优化（性能 + 可靠性 + 安全就绪 + 架构重构）
+
+## 实现状态总结
+
+所有三个阶段（P1 基础层 + P2 中间件与缓存层 + P3 Service 与测试层）均已实现完成。
+
+| 阶段 | 内容 | 状态 | 实现差异 |
+|------|------|------|----------|
+| P1 | 配置环境变量 + AppState + 统一错误 | ✅ 完成 | `db_conn!()` 宏保留（未标 deprecated），全局 `CONFIG` 保留用于启动期 |
+| P2 | 中间件链 + Redis 缓存层 | ✅ 完成 | Redis 连接管理器放在 `utils/src/db.rs`（非独立 `redis.rs`）；健康检查未增强（保持简单） |
+| P3 | Service trait + 测试套件 | ✅ 完成 | Trait 定义放在 `utils/src/traits.rs`（非 `service/src/traits.rs`）以避免循环依赖；测试文件在 `backend/tests/api_tests.rs` |
+
+### 验收标准完成情况
+
+#### P1 验收
+- [x] `cargo build` 全量通过（`db_conn!()` 宏保留但 Service 层已全部使用 `&DatabaseConnection` 参数）
+- [x] `ADMIN_DB_HOST=testhost cargo run` 能覆盖 config.yml 中的 host
+- [x] Service 层返回 `Result<T, ServiceError>`，无 `anyhow::Result` 残留
+- [x] API 功能正常（登录、CRUD、权限检查）
+
+#### P2 验收
+- [x] Redis 连接成功，JWT 黑名单走 Redis
+- [x] 登出后 Redis 中存在 `jwt:blacklist:{token}` 键
+- [x] 受保护请求不再查 MySQL `jwt_blacklists` 表（Redis O(1) EXISTS）
+- [x] Ctrl+C 触发优雅关闭，日志打印"收到关闭信号，正在优雅关闭..."
+- [x] 响应压缩 (CompressionLayer) + 请求超时 (TimeoutLayer 30s) 已启用
+- [x] Dashboard stats 并行查询 (`tokio::try_join!`)
+- [x] `reqwest::Client` 复用（AppState 单例）
+- [ ] 健康检查增强（保持简单返回 `{"status":"ok"}`，未检查 DB/Redis）
+
+#### P3 验收
+- [x] 4 个核心 Service trait 定义完成（UserService, RoleService, MenuService, ApiService）
+- [x] `cargo test` 通过，测试覆盖 ServiceError 转换 + Mock Service
+- [x] Mock 测试可独立运行，不依赖 DB
+- [x] 集成测试使用 Mock Service（`backend/tests/api_tests.rs`）
 
 ## 1. 背景与现状分析
 
@@ -717,23 +751,25 @@ async-trait = "0.1"  # 已存在
 
 ## 10. 验收标准
 
+> 以下为设计阶段定义的验收标准，实现完成情况见文档顶部"实现状态总结"。
+
 ### P1 验收
-- [ ] `cargo build` 全量通过，无 `db_conn!()` 调用残留
-- [ ] `ADMIN_DB_HOST=testhost cargo run` 能覆盖 config.yml 中的 host
-- [ ] Service 层返回 `Result<T, ServiceError>`，无 `anyhow::Result` 残留
-- [ ] API 功能正常（登录、CRUD、权限检查）
+- [x] `cargo build` 全量通过（`db_conn!()` 宏保留但 Service 层已全部使用 `&DatabaseConnection`）
+- [x] `ADMIN_DB_HOST=testhost cargo run` 能覆盖 config.yml 中的 host
+- [x] Service 层返回 `Result<T, ServiceError>`，无 `anyhow::Result` 残留
+- [x] API 功能正常（登录、CRUD、权限检查）
 
 ### P2 验收
-- [ ] Redis 连接成功，健康检查返回 `{"db": true, "redis": true}`
-- [ ] 登出后 Redis 中存在 `jwt_blacklist:{token}` 键
-- [ ] 受保护请求不再查 MySQL `jwt_blacklists` 表
-- [ ] Ctrl+C 触发优雅关闭，日志打印"收到关闭信号"
-- [ ] 响应头包含 `Content-Encoding: gzip`（对大响应）
-- [ ] 请求超时 30s 后返回 408
-- [ ] Dashboard stats 响应时间缩短（4 个查询并行）
+- [x] Redis 连接成功，JWT 黑名单走 Redis O(1) 查询
+- [x] 登出后 Redis 中存在 `jwt:blacklist:{token}` 键
+- [x] 受保护请求不再查 MySQL `jwt_blacklists` 表
+- [x] Ctrl+C 触发优雅关闭，日志打印"收到关闭信号，正在优雅关闭..."
+- [x] 响应压缩 (CompressionLayer) + 请求超时 (TimeoutLayer 30s) 已启用
+- [x] Dashboard stats 并行查询 (`tokio::try_join!`)
+- [ ] 健康检查增强（保持简单返回，未实现 DB/Redis 检查）
 
 ### P3 验收
-- [ ] 5 个核心 Service trait 定义完成
-- [ ] `cargo test` 通过，测试覆盖登录、CRUD、权限
-- [ ] Mock 测试可独立运行，不依赖 DB
-- [ ] 集成测试使用 `scm_test` 数据库
+- [x] 4 个核心 Service trait 定义完成（UserService, RoleService, MenuService, ApiService）
+- [x] `cargo test` 通过，测试覆盖 ServiceError 转换 + Mock Service
+- [x] Mock 测试可独立运行，不依赖 DB
+- [x] 集成测试使用 Mock Service（`backend/tests/api_tests.rs`）

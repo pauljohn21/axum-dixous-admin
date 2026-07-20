@@ -1,0 +1,3 @@
+[env]
+# utoipa-swagger-ui 编译时下载 Swagger UI 资源的代理地址 (国内加速)
+SWAGGER_UI_DOWNLOAD_URL = "https://gh-proxy.com/https://github.com/swagger-api/swagger-ui/archive/refs/tags/v5.17.14.zip"

@@ -6,7 +6,7 @@
 
 use async_trait::async_trait;
 
-use model::dao::{self, sys_user, sys_role, sys_menu, sys_apis};
+use model::dao::{sys_user, sys_role, sys_menu, sys_apis};
 use model::dto::page_dto::{PageRequest, PageResponse};
 use model::dto::sys_user_dto::{LoginDTO, SysUserInsertDTO, SysUserUpdateDTO};
 use model::dto::sys_role_dto::{SysRoleInsertDTO, SysRoleUpdateDTO};
