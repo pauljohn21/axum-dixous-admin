@@ -33,7 +33,6 @@ axum-dixous-admin/
 │   ├── Dioxus.toml
 │   ├── crates/
 │   │   ├── route-guard/      # 路由守卫库 (类似 Vue Router beforeEach)
-│   │   ├── element-icons/    # Element Plus 图标 (137+)
 │   │   ├── dioxus-i18n/      # 国际化库
 │   │   └── slider-captcha/   # 滑块验证码组件
 │   ├── src/
@@ -47,8 +46,7 @@ axum-dixous-admin/
 │   │   ├── config/           # 常量 (BASE_URL, storage keys)
 │   │   ├── storage/          # localStorage 封装
 │   │   ├── i18n/             # 国际化 (zh-CN / en-US)
-│   │   ├── theme/            # 主题切换 (亮色/暗色)
-│   │   └── icons/            # Element Plus 图标 (137+)
+│   │   └── theme/            # 主题切换 (亮色/暗色)
 │   └── AGENTS.md             # Dioxus 0.7 专项指南 (保留)
 ├── axum-dixous-admin-wx/     # 微信小程序 (TypeScript 原生)
 │   └── miniprogram/
@@ -73,7 +71,7 @@ axum-dixous-admin/
 | JWT | jsonwebtoken | 9 |
 | API 文档 | utoipa + Swagger UI | 5 / 9 |
 | 前端框架 | Dioxus | 0.7 |
-| UI 组件 | dioxus-element-plug | 0.2 |
+| UI 组件 | dioxus-element-plug | 0.3 |
 | HTTP 客户端 | gloo-net | 0.7 |
 | 前端路由守卫 | route-guard (本地 crate) | - |
 | 微信小程序 | TypeScript + WXML/WXSS | 原生 |
