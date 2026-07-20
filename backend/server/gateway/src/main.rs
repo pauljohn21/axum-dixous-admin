@@ -80,7 +80,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         redis: redis.clone(),
     };
 
-    let auth_layer = AuthLayer::new(enforcer, redis);
+    let admin_auth = AuthLayer::new(enforcer.clone(), redis.clone(), "admin".into());
+    let wechat_auth = AuthLayer::new(enforcer.clone(), redis.clone(), "wechat".into());
 
     // JWT 密钥检查
     if CONFIG.jwt.secret.is_empty() {
@@ -107,9 +108,14 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .merge(api::public_routes().with_state(state.clone()))
         .merge(api::swagger_routes())
         .merge(
-            api::protected_routes()
+            api::admin_routes()
                 .with_state(state.clone())
-                .layer(auth_layer),
+                .layer(admin_auth),
+        )
+        .merge(
+            api::wechat_routes()
+                .with_state(state.clone())
+                .layer(wechat_auth),
         )
         .layer(GovernorLayer::new(governor_config))
         .layer(body_limit)
