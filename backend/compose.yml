@@ -130,6 +130,9 @@ services:
   #     - "8888:8888"
   #   environment:
   #     TZ: Asia/Shanghai
+  #     # 安全配置（生产环境必须设置）
+  #     ADMIN_JWT_SECRET: ${ADMIN_JWT_SECRET:-dev-only-secret-not-for-production}
+  #     ADMIN_CORS_ORIGINS: ${ADMIN_CORS_ORIGINS:-}  # 例: https://admin.example.com
   #   depends_on:
   #     mysql:
   #       condition: service_healthy
