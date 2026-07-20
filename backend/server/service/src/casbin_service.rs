@@ -37,7 +37,7 @@ impl CasbinService {
         Ok(PageResponse { list, total, page, page_size })
     }
 
-    pub async fn get_by_id(db: &DatabaseConnection, id: u64) -> Result<casbin_rule::Model, ServiceError> {
+    pub async fn get_by_id(db: &DatabaseConnection, id: i64) -> Result<casbin_rule::Model, ServiceError> {
         CasbinRule::find_by_id(id)
             .one(db)
             .await?
@@ -61,7 +61,7 @@ impl CasbinService {
         Ok(result)
     }
 
-    pub async fn update(db: &DatabaseConnection, enforcer: &Arc<RwLock<CachedEnforcer>>, id: u64, rule: UpdateCasbinRuleRequest) -> Result<casbin_rule::Model, ServiceError> {
+    pub async fn update(db: &DatabaseConnection, enforcer: &Arc<RwLock<CachedEnforcer>>, id: i64, rule: UpdateCasbinRuleRequest) -> Result<casbin_rule::Model, ServiceError> {
         let existing_rule = CasbinRule::find_by_id(id)
             .one(db)
             .await?
@@ -96,7 +96,7 @@ impl CasbinService {
         Ok(result)
     }
 
-    pub async fn delete(db: &DatabaseConnection, enforcer: &Arc<RwLock<CachedEnforcer>>, id: u64) -> Result<(), ServiceError> {
+    pub async fn delete(db: &DatabaseConnection, enforcer: &Arc<RwLock<CachedEnforcer>>, id: i64) -> Result<(), ServiceError> {
         let result = CasbinRule::delete_by_id(id)
             .exec(db)
             .await?;
@@ -108,7 +108,7 @@ impl CasbinService {
         Ok(())
     }
 
-    pub async fn delete_batch(db: &DatabaseConnection, ids: Vec<u64>) -> Result<u64, ServiceError> {
+    pub async fn delete_batch(db: &DatabaseConnection, ids: Vec<i64>) -> Result<u64, ServiceError> {
         let result = CasbinRule::delete_many()
             .filter(casbin_rule::Column::Id.is_in(ids))
             .exec(db)
@@ -117,11 +117,12 @@ impl CasbinService {
         Ok(result.rows_affected)
     }
 
-    /// 获取角色的权限策略
-    pub async fn get_policy_by_role(db: &DatabaseConnection, role: &str) -> Result<Vec<casbin_rule::Model>, ServiceError> {
+    /// 获取角色的权限策略（按域过滤）
+    pub async fn get_policy_by_role(db: &DatabaseConnection, role: &str, domain: &str) -> Result<Vec<casbin_rule::Model>, ServiceError> {
         CasbinRule::find()
             .filter(casbin_rule::Column::Ptype.eq("p"))
             .filter(casbin_rule::Column::V0.eq(role))
+            .filter(casbin_rule::Column::V3.eq(domain))
             .all(db)
             .await
             .map_err(Into::into)
@@ -137,14 +138,15 @@ impl CasbinService {
             .map_err(Into::into)
     }
 
-    /// 更新角色的权限策略
-    pub async fn update_role_policies(db: &DatabaseConnection, enforcer: &Arc<RwLock<CachedEnforcer>>, role: &str, policies: Vec<(String, String)>) -> Result<(), ServiceError> {
+    /// 更新角色的权限策略（按域过滤）
+    pub async fn update_role_policies(db: &DatabaseConnection, enforcer: &Arc<RwLock<CachedEnforcer>>, role: &str, domain: &str, policies: Vec<(String, String)>) -> Result<(), ServiceError> {
         let txn = db.begin().await?;
 
-        // 删除现有策略
+        // 删除现有策略（限定域）
         CasbinRule::delete_many()
             .filter(casbin_rule::Column::Ptype.eq("p"))
             .filter(casbin_rule::Column::V0.eq(role))
+            .filter(casbin_rule::Column::V3.eq(domain))
             .exec(&txn)
             .await?;
 
@@ -156,7 +158,7 @@ impl CasbinService {
                 v0: Set(Some(role.to_string())),
                 v1: Set(Some(obj)),
                 v2: Set(Some(act)),
-                v3: Set(None),
+                v3: Set(Some(domain.to_string())),
                 v4: Set(None),
                 v5: Set(None),
             };
