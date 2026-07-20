@@ -50,6 +50,12 @@ casbin = { workspace = true }
 # Redis
 redis = { workspace = true }
 
+# async trait (for dyn-compatible service traits)
+async-trait = { workspace = true }
+
+# 数据模型 (trait 定义引用 model 类型)
+model = { workspace = true }
+
 utoipa = { workspace = true }
 
 [dev-dependencies]

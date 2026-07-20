@@ -9,5 +9,6 @@ pub use crate::{
     rand_utils::rand_utils,
     res::R,
     state::AppState,
+    traits::{ApiService, DashboardStats, MenuService, RoleService, UserService},
 };
 
