@@ -126,7 +126,7 @@ pub fn public_routes() -> Router<AppState> {
         .route("/health", axum::routing::get(health))
 }
 
-pub fn protected_routes() -> Router<AppState> {
+pub fn admin_routes() -> Router<AppState> {
     Router::new()
         .merge(user_api::routes())
         .merge(role_api::routes())
@@ -143,6 +143,12 @@ pub fn protected_routes() -> Router<AppState> {
         .merge(dictionary_detail_api::routes())
         .merge(operation_record_api::routes())
         .merge(generator_api::routes())
+}
+
+pub fn wechat_routes() -> Router<AppState> {
+    Router::new()
+        // 微信小程序 API 路由将在后续任务中添加
+        // 当前为空壳，仅用于绑定 wechat 域的 AuthLayer
 }
 
 pub fn swagger_routes() -> Router {
