@@ -377,6 +377,7 @@ Dioxus 0.7 前端测试能力有限，采用务实策略：
 - **每阶段产出独立规格文档**：`docs/superpowers/specs/YYYY-MM-DD-phase{N}-design.md`
 - **每阶段产出独立实现计划**：`docs/superpowers/plans/YYYY-MM-DD-phase{N}-plan.md`
 - **阶段间不跳步**：前阶段验收通过后再开始下阶段
+- **详细度说明**：Phase 1 和 Phase 2 已有足够细节，可直接进入实现计划；Phase 3-6 为概要级别，将在各自阶段启动时细化为详细规格
 
 ## 12. 不做的事情（YAGNI）
 
