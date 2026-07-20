@@ -41,6 +41,12 @@ anyhow = { workspace = true }
 axum = { workspace = true }
 mime = { workspace = true }
 
+# HTTP 客户端 (微信 API 调用复用连接)
+reqwest = { workspace = true }
+
+# 权限
+casbin = { workspace = true }
+
 utoipa = { workspace = true }
 
 [dev-dependencies]

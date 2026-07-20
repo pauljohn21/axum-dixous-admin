@@ -13,6 +13,7 @@ mod password_utils;
 pub mod prelude;
 mod rand_utils;
 mod res;
+mod state;
 
 #[macro_export]
 macro_rules! db_conn {

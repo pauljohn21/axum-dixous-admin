@@ -8,8 +8,6 @@ use thiserror::Error;
 #[derive(Debug, Error)]
 pub enum AppError {
     #[error(transparent)]
-    Anyhow(#[from] anyhow::Error),
-    #[error(transparent)]
     DbErr(#[from] sea_orm::DbErr),
     #[error(transparent)]
     AppError(#[from] axum::Error),
@@ -19,6 +17,8 @@ pub enum AppError {
     Forbidden(String),
     #[error("资源不存在: {0}")]
     NotFoundError(String),
+    #[error("内部错误: {0}")]
+    Internal(String),
 }
 
 impl IntoResponse for AppError {
@@ -31,6 +31,55 @@ impl IntoResponse for AppError {
         };
         let body = serde_json::json!({ "code": status.as_u16(), "message": message });
         (status, axum::Json(body)).into_response()
+    }
+}
+
+/// Service 层领域错误类型
+#[derive(Debug, Error)]
+pub enum ServiceError {
+    // ── 通用领域错误 ──
+    #[error("资源不存在: {0}")]
+    NotFound(String),
+    #[error("认证失败: {0}")]
+    Auth(String),
+    #[error("权限不足: {0}")]
+    Forbidden(String),
+    #[error("参数错误: {0}")]
+    BadRequest(String),
+
+    // ── 用户领域特定 ──
+    #[error("用户不存在")]
+    UserNotFound,
+    #[error("密码错误")]
+    InvalidPassword,
+    #[error("该微信号已绑定其他账号")]
+    WechatAlreadyBound,
+    #[error("微信登录失败: {0}")]
+    WechatApi(String),
+
+    // ── 基础设施错误 ──
+    #[error(transparent)]
+    Db(#[from] sea_orm::DbErr),
+    #[error("JWT 错误: {0}")]
+    Jwt(#[from] jsonwebtoken::errors::Error),
+    #[error(transparent)]
+    Http(#[from] reqwest::Error),
+}
+
+impl From<ServiceError> for AppError {
+    fn from(e: ServiceError) -> Self {
+        match &e {
+            ServiceError::NotFound(_) | ServiceError::UserNotFound => {
+                AppError::NotFoundError(e.to_string())
+            }
+            ServiceError::Auth(_)
+            | ServiceError::InvalidPassword
+            | ServiceError::WechatApi(_)
+            | ServiceError::WechatAlreadyBound => AppError::AuthError(e.to_string()),
+            ServiceError::Forbidden(_) => AppError::Forbidden(e.to_string()),
+            ServiceError::BadRequest(_) => AppError::AuthError(e.to_string()),
+            _ => AppError::Internal(e.to_string()),
+        }
     }
 }
 
