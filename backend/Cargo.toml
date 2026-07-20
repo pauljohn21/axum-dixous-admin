@@ -106,8 +106,20 @@ utoipa-swagger-ui = { workspace = true }
 
 [dev-dependencies]
 async-trait = { workspace = true }
-tower = { workspace = true }
+tower = { workspace = true, features = ["util"] }
 service = { path = "server/service" }
+http-body-util = { workspace = true }
+redis = { workspace = true }
+sea-orm-migration = { workspace = true }
+casbin-adapter = { workspace = true }
+migration = { workspace = true }
+model = { workspace = true }
+utils = { workspace = true }
+auth-layer = { workspace = true }
+casbin = { workspace = true }
+reqwest = { workspace = true }
+serde_json = { workspace = true }
+http = { workspace = true }
 
 [profile.release]
 codegen-units = 1
