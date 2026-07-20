@@ -73,7 +73,7 @@ Page({
   },
 
   /// 点击字典项查看详情
-  async onDictTap(e: WechatMiniprogram.TouchEventData) {
+  async onDictTap(e: WechatMiniprogram.TouchEvent) {
     const id = e.currentTarget.dataset.id as number
     try {
       const dict = await api.getDict(id)

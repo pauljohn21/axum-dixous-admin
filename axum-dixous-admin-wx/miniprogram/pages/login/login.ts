@@ -1,4 +1,4 @@
-import { api, LoginParams } from '../../utils/api'
+import { api } from '../../utils/api'
 import { setToken } from '../../utils/auth'
 import { USERNAME_KEY } from '../../utils/config'
 import { applyTheme } from '../../utils/theme'

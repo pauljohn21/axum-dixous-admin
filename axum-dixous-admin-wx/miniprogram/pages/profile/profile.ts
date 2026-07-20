@@ -1,6 +1,6 @@
 import { api, UserInfo } from '../../utils/api'
 import { isLoggedIn, clearToken } from '../../utils/auth'
-import { applyTheme, getTheme, toggleTheme } from '../../utils/theme'
+import { applyTheme, toggleTheme } from '../../utils/theme'
 
 Page({
   data: {

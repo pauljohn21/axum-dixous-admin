@@ -89,7 +89,7 @@ Page({
   },
 
   /// 打开编辑弹窗
-  onEdit(e: WechatMiniprogram.TouchEventData) {
+  onEdit(e: WechatMiniprogram.TouchEvent) {
     const id = e.currentTarget.dataset.id as number
     const role = this.data.roles.find(r => r.id === id)
     if (!role) return
@@ -154,7 +154,7 @@ Page({
   },
 
   /// 删除角色
-  onDelete(e: WechatMiniprogram.TouchEventData) {
+  onDelete(e: WechatMiniprogram.TouchEvent) {
     const id = e.currentTarget.dataset.id as number
     const role = this.data.roles.find(r => r.id === id)
 

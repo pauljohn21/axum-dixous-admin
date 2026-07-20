@@ -97,7 +97,7 @@ Page({
   },
 
   /// 切换折叠/展开
-  onToggle(e: WechatMiniprogram.TouchEventData) {
+  onToggle(e: WechatMiniprogram.TouchEvent) {
     const id = e.currentTarget.dataset.id as number
     this.toggleNode(this.data.tree, id)
     this.updateFlatList()
@@ -118,7 +118,7 @@ Page({
   },
 
   /// 点击菜单项查看详情
-  async onMenuTap(e: WechatMiniprogram.TouchEventData) {
+  async onMenuTap(e: WechatMiniprogram.TouchEvent) {
     const id = e.currentTarget.dataset.id as number
     try {
       const menu = await api.getMenu(id)

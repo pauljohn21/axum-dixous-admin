@@ -1,10 +1,10 @@
-import { api, UserItem } from '../../utils/api'
+import { api } from '../../utils/api'
 import { isLoggedIn } from '../../utils/auth'
 import { applyTheme } from '../../utils/theme'
 
 Page({
   data: {
-    users: [],
+    users: [] as any[],
     keyword: '',
     page: 1,
     pageSize: 10,
@@ -46,7 +46,7 @@ Page({
   },
 
   /// 点击用户项 — 弹出操作菜单
-  onUserTap(e: WechatMiniprogram.TouchEventData) {
+  onUserTap(e: WechatMiniprogram.TouchEvent) {
     const id = e.currentTarget.dataset.id as number
     const enable = e.currentTarget.dataset.enable as number
     const actionText = enable ? '禁用' : '启用'
@@ -85,7 +85,7 @@ Page({
       const hasMore = users.length < result.total
 
       this.setData({
-        users,
+        users: users as any[],
         total: result.total,
         page: page + 1,
         hasMore,
