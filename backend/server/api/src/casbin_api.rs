@@ -43,7 +43,7 @@ pub async fn get_by_id(State(state): State<AppState>, Path(id): Path<u64>) -> Re
     tag = "Casbin策略"
 )]
 pub async fn create(State(state): State<AppState>, Json(request): Json<CreateCasbinRuleRequest>) -> Result<impl IntoResponse, AppError> {
-    let rule = CasbinService::create(&state.db, request).await?;
+    let rule = CasbinService::create(&state.db, &state.enforcer, request).await?;
     Ok(R::ok(rule))
 }
 
@@ -55,7 +55,7 @@ pub async fn create(State(state): State<AppState>, Json(request): Json<CreateCas
     tag = "Casbin策略"
 )]
 pub async fn update(State(state): State<AppState>, Path(id): Path<u64>, Json(request): Json<UpdateCasbinRuleRequest>) -> Result<impl IntoResponse, AppError> {
-    let rule = CasbinService::update(&state.db, id, request).await?;
+    let rule = CasbinService::update(&state.db, &state.enforcer, id, request).await?;
     Ok(R::ok(rule))
 }
 
@@ -67,7 +67,7 @@ pub async fn update(State(state): State<AppState>, Path(id): Path<u64>, Json(req
     tag = "Casbin策略"
 )]
 pub async fn delete(State(state): State<AppState>, Path(id): Path<u64>) -> Result<impl IntoResponse, AppError> {
-    CasbinService::delete(&state.db, id).await?;
+    CasbinService::delete(&state.db, &state.enforcer, id).await?;
     Ok(R::ok(()))
 }
 
@@ -113,8 +113,8 @@ pub async fn update_role_policies(State(state): State<AppState>, Path(role): Pat
         .map(|info| (info.path, info.method))
         .collect();
 
-    CasbinService::update_role_policies(&state.db, &role, policies)
-        .await?;
+    CasbinService::update_role_policies(&state.db, &state.enforcer, &role, policies)
+        .await?;;
 
     Ok(R::ok(()))
 }

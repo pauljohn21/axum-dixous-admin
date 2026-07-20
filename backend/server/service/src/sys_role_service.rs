@@ -1,10 +1,16 @@
 use sea_orm::{ActiveModelTrait, ColumnTrait, DatabaseConnection, EntityTrait, PaginatorTrait, QueryFilter, QuerySelect, Set, TransactionTrait};
 
+use std::sync::Arc;
+use tokio::sync::RwLock;
+use casbin::CachedEnforcer;
+
 use model::dao::sys_role;
 use model::dto::page_dto::{PageRequest, PageResponse};
 use model::dto::sys_role_dto::{SysRoleInsertDTO, SysRoleUpdateDTO};
 use model::prelude::SysRole;
 use utils::prelude::ServiceError;
+
+use crate::enforcer::reload_policy_with;
 
 pub struct SysRoleService;
 
@@ -58,7 +64,7 @@ impl SysRoleService {
         Ok(updated.update(db).await?)
     }
 
-    pub async fn delete(db: &DatabaseConnection, id: i32) -> Result<(), ServiceError> {
+    pub async fn delete(db: &DatabaseConnection, enforcer: &Arc<RwLock<CachedEnforcer>>, id: i32) -> Result<(), ServiceError> {
         let txn = db.begin().await?;
 
         // 清理角色-菜单关联
@@ -95,7 +101,7 @@ impl SysRoleService {
         txn.commit().await?;
 
         // 刷新 Casbin 缓存
-        crate::enforcer::reload_policy().await;
+        reload_policy_with(enforcer).await;
         Ok(())
     }
 }

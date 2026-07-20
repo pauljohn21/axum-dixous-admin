@@ -5,7 +5,11 @@ use model::dto::page_dto::{PageRequest, PageResponse};
 use model::prelude::CasbinRule;
 use utils::prelude::ServiceError;
 
-use crate::enforcer::reload_policy;
+use std::sync::Arc;
+use tokio::sync::RwLock;
+use casbin::CachedEnforcer;
+
+use crate::enforcer::reload_policy_with;
 
 pub struct CasbinService;
 
@@ -40,7 +44,7 @@ impl CasbinService {
             .ok_or_else(|| ServiceError::NotFound("Casbin规则不存在".into()))
     }
 
-    pub async fn create(db: &DatabaseConnection, rule: CreateCasbinRuleRequest) -> Result<casbin_rule::Model, ServiceError> {
+    pub async fn create(db: &DatabaseConnection, enforcer: &Arc<RwLock<CachedEnforcer>>, rule: CreateCasbinRuleRequest) -> Result<casbin_rule::Model, ServiceError> {
         let active_model = casbin_rule::ActiveModel {
             id: Set(0), // Auto increment
             ptype: Set(rule.ptype),
@@ -53,11 +57,11 @@ impl CasbinService {
         };
 
         let result = active_model.insert(db).await?;
-        reload_policy().await;
+        reload_policy_with(enforcer).await;
         Ok(result)
     }
 
-    pub async fn update(db: &DatabaseConnection, id: u64, rule: UpdateCasbinRuleRequest) -> Result<casbin_rule::Model, ServiceError> {
+    pub async fn update(db: &DatabaseConnection, enforcer: &Arc<RwLock<CachedEnforcer>>, id: u64, rule: UpdateCasbinRuleRequest) -> Result<casbin_rule::Model, ServiceError> {
         let existing_rule = CasbinRule::find_by_id(id)
             .one(db)
             .await?
@@ -88,11 +92,11 @@ impl CasbinService {
         }
 
         let result = active_model.update(db).await?;
-        reload_policy().await;
+        reload_policy_with(enforcer).await;
         Ok(result)
     }
 
-    pub async fn delete(db: &DatabaseConnection, id: u64) -> Result<(), ServiceError> {
+    pub async fn delete(db: &DatabaseConnection, enforcer: &Arc<RwLock<CachedEnforcer>>, id: u64) -> Result<(), ServiceError> {
         let result = CasbinRule::delete_by_id(id)
             .exec(db)
             .await?;
@@ -100,7 +104,7 @@ impl CasbinService {
         if result.rows_affected == 0 {
             return Err(ServiceError::NotFound("规则不存在或已被删除".into()));
         }
-        reload_policy().await;
+        reload_policy_with(enforcer).await;
         Ok(())
     }
 
@@ -134,7 +138,7 @@ impl CasbinService {
     }
 
     /// 更新角色的权限策略
-    pub async fn update_role_policies(db: &DatabaseConnection, role: &str, policies: Vec<(String, String)>) -> Result<(), ServiceError> {
+    pub async fn update_role_policies(db: &DatabaseConnection, enforcer: &Arc<RwLock<CachedEnforcer>>, role: &str, policies: Vec<(String, String)>) -> Result<(), ServiceError> {
         let txn = db.begin().await?;
 
         // 删除现有策略
@@ -160,7 +164,7 @@ impl CasbinService {
         }
 
         txn.commit().await?;
-        reload_policy().await;
+        reload_policy_with(enforcer).await;
         Ok(())
     }
 

@@ -4,6 +4,9 @@
 
 use async_trait::async_trait;
 use sea_orm::DatabaseConnection;
+use std::sync::Arc;
+use tokio::sync::RwLock;
+use casbin::CachedEnforcer;
 
 use model::dao::{sys_user, sys_role, sys_menu, sys_apis};
 use model::dto::page_dto::{PageRequest, PageResponse};
@@ -71,6 +74,7 @@ impl UserService for UserServiceImpl {
 
 pub struct RoleServiceImpl {
     pub db: DatabaseConnection,
+    pub enforcer: Arc<RwLock<CachedEnforcer>>,
 }
 
 #[async_trait]
@@ -88,7 +92,7 @@ impl RoleService for RoleServiceImpl {
         SysRoleService::update(&self.db, id, data).await
     }
     async fn delete(&self, id: i32) -> Result<(), ServiceError> {
-        SysRoleService::delete(&self.db, id).await
+        SysRoleService::delete(&self.db, &self.enforcer, id).await
     }
 }
 

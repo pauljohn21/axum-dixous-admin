@@ -66,7 +66,7 @@ pub async fn update(State(state): State<AppState>, Path(id): Path<i32>, Json(dat
     tag = "角色管理"
 )]
 pub async fn delete_role(State(state): State<AppState>, Path(id): Path<i32>) -> Result<impl IntoResponse, AppError> {
-    SysRoleService::delete(&state.db, id).await?;
+    SysRoleService::delete(&state.db, &state.enforcer, id).await?;
     Ok(R::ok(()))
 }
 

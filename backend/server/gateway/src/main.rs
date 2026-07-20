@@ -29,9 +29,6 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         CachedEnforcer::new(model, adapter).await?,
     ));
 
-    // 将 enforcer 注入 service 层，用于策略修改后刷新缓存
-    service::enforcer::set_enforcer(enforcer.clone());
-
     // 构建 HTTP 客户端（复用连接池）
     let http_client = reqwest::Client::new();
 
