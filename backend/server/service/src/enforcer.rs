@@ -14,7 +14,14 @@ pub fn set_enforcer(e: Arc<RwLock<CachedEnforcer>>) {
     let _ = ENFORCER.set(e);
 }
 
-/// 重新加载 Casbin 策略并刷新缓存
+/// 重新加载 Casbin 策略（使用传入的 enforcer）
+pub async fn reload_policy_with(enforcer: &Arc<RwLock<CachedEnforcer>>) {
+    if let Err(err) = enforcer.write().await.load_policy().await {
+        tracing::error!("Casbin 策略重载失败: {}", err);
+    }
+}
+
+/// 重新加载 Casbin 策略并刷新缓存（使用全局 enforcer，过渡期保留）
 ///
 /// 在 CasbinService 的 create / update / delete 操作后调用，
 /// 确保内存中的 CachedEnforcer 与数据库同步。

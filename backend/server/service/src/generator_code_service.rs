@@ -2,12 +2,12 @@
 //!
 //! 根据配置生成前后端代码，支持预览和实际写入文件。
 
-use anyhow::Result;
 use chrono::Local;
 use serde::Serialize;
 use utoipa::ToSchema;
 
 use model::dto::sys_generator_history_dto::PreviewCodeDTO;
+use utils::prelude::ServiceError;
 
 /// 生成的代码文件
 #[derive(Debug, Clone, Serialize, ToSchema)]
@@ -29,9 +29,10 @@ pub struct GeneratorCodeService;
 
 impl GeneratorCodeService {
     /// 预览代码 - 根据 JSON 配置生成所有代码文件内容
-    pub async fn preview_code(data: PreviewCodeDTO) -> Result<PreviewCodeResponse> {
-        let config: serde_json::Value = serde_json::from_str(&data.config_json)?;
-        
+    pub async fn preview_code(data: PreviewCodeDTO) -> Result<PreviewCodeResponse, ServiceError> {
+        let config: serde_json::Value = serde_json::from_str(&data.config_json)
+            .map_err(|e| ServiceError::BadRequest(e.to_string()))?;
+
         let mut backend_files = Vec::new();
         let mut frontend_files = Vec::new();
 

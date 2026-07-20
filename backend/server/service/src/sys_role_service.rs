@@ -1,17 +1,15 @@
-use anyhow::{anyhow, Result};
-use sea_orm::{ActiveModelTrait, ColumnTrait, EntityTrait, PaginatorTrait, QueryFilter, QuerySelect, Set, TransactionTrait};
+use sea_orm::{ActiveModelTrait, ColumnTrait, DatabaseConnection, EntityTrait, PaginatorTrait, QueryFilter, QuerySelect, Set, TransactionTrait};
 
 use model::dao::sys_role;
 use model::dto::page_dto::{PageRequest, PageResponse};
 use model::dto::sys_role_dto::{SysRoleInsertDTO, SysRoleUpdateDTO};
 use model::prelude::SysRole;
-use utils::db_conn;
+use utils::prelude::ServiceError;
 
 pub struct SysRoleService;
 
 impl SysRoleService {
-    pub async fn insert(data: SysRoleInsertDTO) -> Result<sys_role::Model> {
-        let db = db_conn!();
+    pub async fn insert(db: &DatabaseConnection, data: SysRoleInsertDTO) -> Result<sys_role::Model, ServiceError> {
         let active = sys_role::ActiveModel {
             en_name: Set(Some(data.en_name)),
             cn_name: Set(Some(data.cn_name)),
@@ -19,11 +17,10 @@ impl SysRoleService {
             ..Default::default()
         };
         let result = SysRole::insert(active).exec(db).await?;
-        Self::get_by_id(result.last_insert_id).await
+        Self::get_by_id(db, result.last_insert_id).await
     }
 
-    pub async fn list(query: PageRequest) -> Result<PageResponse<sys_role::Model>> {
-        let db = db_conn!();
+    pub async fn list(db: &DatabaseConnection, query: PageRequest) -> Result<PageResponse<sys_role::Model>, ServiceError> {
         let page = query.page.unwrap_or(1);
         let page_size = query.page_size.unwrap_or(10);
 
@@ -41,19 +38,18 @@ impl SysRoleService {
         Ok(PageResponse { list, total, page, page_size })
     }
 
-    pub async fn get_by_id(id: i32) -> Result<sys_role::Model> {
+    pub async fn get_by_id(db: &DatabaseConnection, id: i32) -> Result<sys_role::Model, ServiceError> {
         SysRole::find_by_id(id)
-            .one(db_conn!())
+            .one(db)
             .await?
-            .ok_or_else(|| anyhow!("角色不存在"))
+            .ok_or_else(|| ServiceError::NotFound("角色不存在".into()))
     }
 
-    pub async fn update(id: i32, data: SysRoleUpdateDTO) -> Result<sys_role::Model> {
-        let db = db_conn!();
+    pub async fn update(db: &DatabaseConnection, id: i32, data: SysRoleUpdateDTO) -> Result<sys_role::Model, ServiceError> {
         let role: sys_role::ActiveModel = SysRole::find_by_id(id)
             .one(db)
             .await?
-            .ok_or_else(|| anyhow!("角色不存在"))?
+            .ok_or_else(|| ServiceError::NotFound("角色不存在".into()))?
             .into();
         let mut updated = role;
         if let Some(v) = data.en_name { updated.en_name = Set(Some(v)); }
@@ -62,8 +58,7 @@ impl SysRoleService {
         Ok(updated.update(db).await?)
     }
 
-    pub async fn delete(id: i32) -> Result<()> {
-        let db = db_conn!();
+    pub async fn delete(db: &DatabaseConnection, id: i32) -> Result<(), ServiceError> {
         let txn = db.begin().await?;
 
         // 清理角色-菜单关联

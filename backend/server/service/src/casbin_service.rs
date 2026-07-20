@@ -1,18 +1,16 @@
-use anyhow::{anyhow, Result};
-use sea_orm::{ColumnTrait, EntityTrait, PaginatorTrait, QueryFilter, QuerySelect, ActiveModelTrait, Set, TransactionTrait};
+use sea_orm::{ColumnTrait, DatabaseConnection, EntityTrait, PaginatorTrait, QueryFilter, QuerySelect, ActiveModelTrait, Set, TransactionTrait};
 
 use model::dao::casbin_rule;
 use model::dto::page_dto::{PageRequest, PageResponse};
 use model::prelude::CasbinRule;
-use utils::db_conn;
+use utils::prelude::ServiceError;
 
 use crate::enforcer::reload_policy;
 
 pub struct CasbinService;
 
 impl CasbinService {
-    pub async fn list(query: PageRequest) -> Result<PageResponse<casbin_rule::Model>> {
-        let db = db_conn!();
+    pub async fn list(db: &DatabaseConnection, query: PageRequest) -> Result<PageResponse<casbin_rule::Model>, ServiceError> {
         let page = query.page.unwrap_or(1);
         let page_size = query.page_size.unwrap_or(10);
 
@@ -35,16 +33,14 @@ impl CasbinService {
         Ok(PageResponse { list, total, page, page_size })
     }
 
-    pub async fn get_by_id(id: u64) -> Result<casbin_rule::Model> {
+    pub async fn get_by_id(db: &DatabaseConnection, id: u64) -> Result<casbin_rule::Model, ServiceError> {
         CasbinRule::find_by_id(id)
-            .one(db_conn!())
+            .one(db)
             .await?
-            .ok_or_else(|| anyhow!("Casbin规则不存在"))
+            .ok_or_else(|| ServiceError::NotFound("Casbin规则不存在".into()))
     }
 
-    pub async fn create(rule: CreateCasbinRuleRequest) -> Result<casbin_rule::Model> {
-        let db = db_conn!();
-        
+    pub async fn create(db: &DatabaseConnection, rule: CreateCasbinRuleRequest) -> Result<casbin_rule::Model, ServiceError> {
         let active_model = casbin_rule::ActiveModel {
             id: Set(0), // Auto increment
             ptype: Set(rule.ptype),
@@ -55,22 +51,20 @@ impl CasbinService {
             v4: Set(rule.v4),
             v5: Set(rule.v5),
         };
-        
-        let result = active_model.insert(db).await.map_err(|e| anyhow!("创建规则失败: {}", e))?;
+
+        let result = active_model.insert(db).await?;
         reload_policy().await;
         Ok(result)
     }
 
-    pub async fn update(id: u64, rule: UpdateCasbinRuleRequest) -> Result<casbin_rule::Model> {
-        let db = db_conn!();
-        
+    pub async fn update(db: &DatabaseConnection, id: u64, rule: UpdateCasbinRuleRequest) -> Result<casbin_rule::Model, ServiceError> {
         let existing_rule = CasbinRule::find_by_id(id)
             .one(db)
             .await?
-            .ok_or_else(|| anyhow!("规则不存在"))?;
-            
+            .ok_or_else(|| ServiceError::NotFound("规则不存在".into()))?;
+
         let mut active_model: casbin_rule::ActiveModel = existing_rule.into();
-        
+
         if let Some(ptype) = rule.ptype {
             active_model.ptype = Set(Some(ptype));
         }
@@ -92,74 +86,64 @@ impl CasbinService {
         if let Some(v5) = rule.v5 {
             active_model.v5 = Set(Some(v5));
         }
-        
-        let result = active_model.update(db).await.map_err(|e| anyhow!("更新规则失败: {}", e))?;
+
+        let result = active_model.update(db).await?;
         reload_policy().await;
         Ok(result)
     }
 
-    pub async fn delete(id: u64) -> Result<()> {
-        let db = db_conn!();
-        
+    pub async fn delete(db: &DatabaseConnection, id: u64) -> Result<(), ServiceError> {
         let result = CasbinRule::delete_by_id(id)
             .exec(db)
             .await?;
-            
+
         if result.rows_affected == 0 {
-            return Err(anyhow!("规则不存在或已被删除"));
+            return Err(ServiceError::NotFound("规则不存在或已被删除".into()));
         }
         reload_policy().await;
         Ok(())
     }
 
-    pub async fn delete_batch(ids: Vec<u64>) -> Result<u64> {
-        let db = db_conn!();
-        
+    pub async fn delete_batch(db: &DatabaseConnection, ids: Vec<u64>) -> Result<u64, ServiceError> {
         let result = CasbinRule::delete_many()
             .filter(casbin_rule::Column::Id.is_in(ids))
             .exec(db)
             .await?;
-            
+
         Ok(result.rows_affected)
     }
 
     /// 获取角色的权限策略
-    pub async fn get_policy_by_role(role: &str) -> Result<Vec<casbin_rule::Model>> {
-        let db = db_conn!();
-        
+    pub async fn get_policy_by_role(db: &DatabaseConnection, role: &str) -> Result<Vec<casbin_rule::Model>, ServiceError> {
         CasbinRule::find()
             .filter(casbin_rule::Column::Ptype.eq("p"))
             .filter(casbin_rule::Column::V0.eq(role))
             .all(db)
             .await
-            .map_err(|e| anyhow!("查询角色策略失败: {}", e))
+            .map_err(Into::into)
     }
 
     /// 获取用户的角色
-    pub async fn get_roles_for_user(user: &str) -> Result<Vec<casbin_rule::Model>> {
-        let db = db_conn!();
-        
+    pub async fn get_roles_for_user(db: &DatabaseConnection, user: &str) -> Result<Vec<casbin_rule::Model>, ServiceError> {
         CasbinRule::find()
             .filter(casbin_rule::Column::Ptype.eq("g"))
             .filter(casbin_rule::Column::V0.eq(user))
             .all(db)
             .await
-            .map_err(|e| anyhow!("查询用户角色失败: {}", e))
+            .map_err(Into::into)
     }
 
     /// 更新角色的权限策略
-    pub async fn update_role_policies(role: &str, policies: Vec<(String, String)>) -> Result<()> {
-        let db = db_conn!();
-        
+    pub async fn update_role_policies(db: &DatabaseConnection, role: &str, policies: Vec<(String, String)>) -> Result<(), ServiceError> {
         let txn = db.begin().await?;
-        
+
         // 删除现有策略
         CasbinRule::delete_many()
             .filter(casbin_rule::Column::Ptype.eq("p"))
             .filter(casbin_rule::Column::V0.eq(role))
             .exec(&txn)
             .await?;
-            
+
         // 添加新策略
         for (obj, act) in policies {
             let active_model = casbin_rule::ActiveModel {
@@ -174,16 +158,14 @@ impl CasbinService {
             };
             active_model.insert(&txn).await?;
         }
-        
+
         txn.commit().await?;
         reload_policy().await;
         Ok(())
     }
 
     /// 批量删除策略
-    pub async fn delete_policies(&self, policies: Vec<Vec<String>>) -> Result<bool> {
-        let db = db_conn!();
-        
+    pub async fn delete_policies(&self, db: &DatabaseConnection, policies: Vec<Vec<String>>) -> Result<bool, ServiceError> {
         for policy in policies {
             if policy.len() >= 3 {
                 CasbinRule::delete_many()
@@ -195,7 +177,7 @@ impl CasbinService {
                     .await?;
             }
         }
-        
+
         Ok(true)
     }
 }

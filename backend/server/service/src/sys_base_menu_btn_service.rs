@@ -1,17 +1,15 @@
-use anyhow::{anyhow, Result};
-use sea_orm::{ActiveModelTrait, ColumnTrait, EntityTrait, PaginatorTrait, QueryFilter, QuerySelect, Set};
+use sea_orm::{ActiveModelTrait, ColumnTrait, DatabaseConnection, EntityTrait, PaginatorTrait, QueryFilter, QuerySelect, Set};
 
 use model::dao::sys_base_menu_btns;
 use model::dto::page_dto::{PageRequest, PageResponse};
 use model::dto::sys_base_menu_btn_dto::{SysBaseMenuBtnInsertDTO, SysBaseMenuBtnUpdateDTO};
 use model::prelude::SysBaseMenuBtns;
-use utils::db_conn;
+use utils::prelude::ServiceError;
 
 pub struct SysBaseMenuBtnService;
 
 impl SysBaseMenuBtnService {
-    pub async fn insert(data: SysBaseMenuBtnInsertDTO) -> Result<sys_base_menu_btns::Model> {
-        let db = db_conn!();
+    pub async fn insert(db: &DatabaseConnection, data: SysBaseMenuBtnInsertDTO) -> Result<sys_base_menu_btns::Model, ServiceError> {
         let active = sys_base_menu_btns::ActiveModel {
             name: Set(data.name),
             desc: Set(data.desc),
@@ -19,11 +17,10 @@ impl SysBaseMenuBtnService {
             ..Default::default()
         };
         let result = SysBaseMenuBtns::insert(active).exec(db).await?;
-        Self::get_by_id(result.last_insert_id).await
+        Self::get_by_id(db, result.last_insert_id).await
     }
 
-    pub async fn list(query: PageRequest) -> Result<PageResponse<sys_base_menu_btns::Model>> {
-        let db = db_conn!();
+    pub async fn list(db: &DatabaseConnection, query: PageRequest) -> Result<PageResponse<sys_base_menu_btns::Model>, ServiceError> {
         let page = query.page.unwrap_or(1);
         let page_size = query.page_size.unwrap_or(10);
 
@@ -41,19 +38,18 @@ impl SysBaseMenuBtnService {
         Ok(PageResponse { list, total, page, page_size })
     }
 
-    pub async fn get_by_id(id: u64) -> Result<sys_base_menu_btns::Model> {
+    pub async fn get_by_id(db: &DatabaseConnection, id: u64) -> Result<sys_base_menu_btns::Model, ServiceError> {
         SysBaseMenuBtns::find_by_id(id)
-            .one(db_conn!())
+            .one(db)
             .await?
-            .ok_or_else(|| anyhow!("菜单按钮不存在"))
+            .ok_or_else(|| ServiceError::NotFound("菜单按钮不存在".into()))
     }
 
-    pub async fn update(id: u64, data: SysBaseMenuBtnUpdateDTO) -> Result<sys_base_menu_btns::Model> {
-        let db = db_conn!();
+    pub async fn update(db: &DatabaseConnection, id: u64, data: SysBaseMenuBtnUpdateDTO) -> Result<sys_base_menu_btns::Model, ServiceError> {
         let btn: sys_base_menu_btns::ActiveModel = SysBaseMenuBtns::find_by_id(id)
             .one(db)
             .await?
-            .ok_or_else(|| anyhow!("菜单按钮不存在"))?
+            .ok_or_else(|| ServiceError::NotFound("菜单按钮不存在".into()))?
             .into();
         let mut updated = btn;
         if let Some(v) = data.name { updated.name = Set(Some(v)); }
@@ -62,8 +58,8 @@ impl SysBaseMenuBtnService {
         Ok(updated.update(db).await?)
     }
 
-    pub async fn delete(id: u64) -> Result<()> {
-        SysBaseMenuBtns::delete_by_id(id).exec(db_conn!()).await?;
+    pub async fn delete(db: &DatabaseConnection, id: u64) -> Result<(), ServiceError> {
+        SysBaseMenuBtns::delete_by_id(id).exec(db).await?;
         Ok(())
     }
 }

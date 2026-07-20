@@ -6,8 +6,7 @@
 //! - 从数据库获取元数据 (数据库名/表名/字段信息)
 //! - 根据数据库表结构生成 YAML 配置
 
-use anyhow::{anyhow, Result};
-use sea_orm::{ActiveModelTrait, ColumnTrait, ConnectionTrait, EntityTrait, PaginatorTrait, QueryFilter, QuerySelect, Set};
+use sea_orm::{ActiveModelTrait, ColumnTrait, ConnectionTrait, DatabaseConnection, EntityTrait, PaginatorTrait, QueryFilter, QuerySelect, Set};
 
 use model::dao::sys_generator_history;
 use model::dto::page_dto::{PageRequest, PageResponse};
@@ -16,14 +15,13 @@ use model::dto::sys_generator_history_dto::{
     SysGeneratorHistoryInsertDTO, SysGeneratorHistoryUpdateDTO, TableInfo,
 };
 use model::prelude::SysGeneratorHistory;
-use utils::db_conn;
+use utils::prelude::ServiceError;
 
 pub struct GeneratorHistoryService;
 
 impl GeneratorHistoryService {
     /// 创建历史记录
-    pub async fn insert(data: SysGeneratorHistoryInsertDTO) -> Result<sys_generator_history::Model> {
-        let db = db_conn!();
+    pub async fn insert(db: &DatabaseConnection, data: SysGeneratorHistoryInsertDTO) -> Result<sys_generator_history::Model, ServiceError> {
         let active = sys_generator_history::ActiveModel {
             table_name: Set(data.table_name),
             resource: Set(data.resource),
@@ -34,12 +32,11 @@ impl GeneratorHistoryService {
             ..Default::default()
         };
         let result = SysGeneratorHistory::insert(active).exec(db).await?;
-        Self::get_by_id(result.last_insert_id).await
+        Self::get_by_id(db, result.last_insert_id).await
     }
 
     /// 分页查询历史记录
-    pub async fn list(query: PageRequest) -> Result<PageResponse<sys_generator_history::Model>> {
-        let db = db_conn!();
+    pub async fn list(db: &DatabaseConnection, query: PageRequest) -> Result<PageResponse<sys_generator_history::Model>, ServiceError> {
         let page = query.page.unwrap_or(1);
         let page_size = query.page_size.unwrap_or(10);
 
@@ -63,26 +60,25 @@ impl GeneratorHistoryService {
     }
 
     /// 按 ID 获取
-    pub async fn get_by_id(id: u64) -> Result<sys_generator_history::Model> {
+    pub async fn get_by_id(db: &DatabaseConnection, id: u64) -> Result<sys_generator_history::Model, ServiceError> {
         SysGeneratorHistory::find_by_id(id)
-            .one(db_conn!())
+            .one(db)
             .await?
-            .ok_or_else(|| anyhow!("历史记录不存在"))
+            .ok_or_else(|| ServiceError::NotFound("历史记录不存在".into()))
     }
 
     /// 获取历史记录的 YAML 配置
-    pub async fn get_meta(id: u64) -> Result<String> {
-        let record = Self::get_by_id(id).await?;
+    pub async fn get_meta(db: &DatabaseConnection, id: u64) -> Result<String, ServiceError> {
+        let record = Self::get_by_id(db, id).await?;
         Ok(record.request)
     }
 
     /// 更新历史记录
-    pub async fn update(id: u64, data: SysGeneratorHistoryUpdateDTO) -> Result<sys_generator_history::Model> {
-        let db = db_conn!();
+    pub async fn update(db: &DatabaseConnection, id: u64, data: SysGeneratorHistoryUpdateDTO) -> Result<sys_generator_history::Model, ServiceError> {
         let record: sys_generator_history::ActiveModel = SysGeneratorHistory::find_by_id(id)
             .one(db)
             .await?
-            .ok_or_else(|| anyhow!("历史记录不存在"))?
+            .ok_or_else(|| ServiceError::NotFound("历史记录不存在".into()))?
             .into();
         let mut updated = record;
         if let Some(v) = data.table_name { updated.table_name = Set(v); }
@@ -95,18 +91,17 @@ impl GeneratorHistoryService {
     }
 
     /// 删除历史记录
-    pub async fn delete(id: u64) -> Result<()> {
-        SysGeneratorHistory::delete_by_id(id).exec(db_conn!()).await?;
+    pub async fn delete(db: &DatabaseConnection, id: u64) -> Result<(), ServiceError> {
+        SysGeneratorHistory::delete_by_id(id).exec(db).await?;
         Ok(())
     }
 
     /// 回滚: 标记 flag=1, 可选删除数据库表
-    pub async fn rollback(data: GeneratorRollbackDTO) -> Result<()> {
-        let record = Self::get_by_id(data.id).await?;
+    pub async fn rollback(db: &DatabaseConnection, data: GeneratorRollbackDTO) -> Result<(), ServiceError> {
+        let record = Self::get_by_id(db, data.id).await?;
 
         // 可选: 删除数据库表
         if data.delete_table {
-            let db = db_conn!();
             let sql = format!("DROP TABLE IF EXISTS `{}`", record.table_name);
             db.execute(sea_orm::Statement::from_sql_and_values(
                 db.get_database_backend(),
@@ -118,6 +113,7 @@ impl GeneratorHistoryService {
 
         // 标记为已回滚
         Self::update(
+            db,
             data.id,
             SysGeneratorHistoryUpdateDTO {
                 flag: Some(1),
@@ -130,8 +126,7 @@ impl GeneratorHistoryService {
     }
 
     /// 检测重复 (同表名且 flag=0)
-    pub async fn check_repeat(table_name: &str) -> bool {
-        let db = db_conn!();
+    pub async fn check_repeat(db: &DatabaseConnection, table_name: &str) -> bool {
         let count = SysGeneratorHistory::find()
             .filter(sys_generator_history::Column::TableName.eq(table_name))
             .filter(sys_generator_history::Column::Flag.eq(0))
@@ -144,8 +139,7 @@ impl GeneratorHistoryService {
     // ===== 从数据库创建 =====
 
     /// 获取所有数据库名
-    pub async fn get_databases() -> Result<Vec<DatabaseInfo>> {
-        let db = db_conn!();
+    pub async fn get_databases(db: &DatabaseConnection) -> Result<Vec<DatabaseInfo>, ServiceError> {
         let rows = db
             .query_all(sea_orm::Statement::from_sql_and_values(
                 db.get_database_backend(),
@@ -163,8 +157,7 @@ impl GeneratorHistoryService {
     }
 
     /// 获取指定数据库的所有表名
-    pub async fn get_tables(db_name: &str) -> Result<Vec<TableInfo>> {
-        let db = db_conn!();
+    pub async fn get_tables(db: &DatabaseConnection, db_name: &str) -> Result<Vec<TableInfo>, ServiceError> {
         let rows = db
             .query_all(sea_orm::Statement::from_sql_and_values(
                 db.get_database_backend(),
@@ -182,8 +175,7 @@ impl GeneratorHistoryService {
     }
 
     /// 获取指定表的字段信息
-    pub async fn get_columns(db_name: &str, table_name: &str) -> Result<Vec<ColumnInfo>> {
-        let db = db_conn!();
+    pub async fn get_columns(db: &DatabaseConnection, db_name: &str, table_name: &str) -> Result<Vec<ColumnInfo>, ServiceError> {
         let sql = r#"
             SELECT 
                 c.COLUMN_NAME AS column_name,
@@ -279,8 +271,8 @@ impl GeneratorHistoryService {
     }
 
     /// 根据数据库表结构生成 JSON 配置
-    pub async fn generate_from_table(data: GenerateFromTableDTO) -> Result<String> {
-        let columns = Self::get_columns(&data.db_name, &data.table_name).await?;
+    pub async fn generate_from_table(db: &DatabaseConnection, data: GenerateFromTableDTO) -> Result<String, ServiceError> {
+        let columns = Self::get_columns(db, &data.db_name, &data.table_name).await?;
 
         let table_name = &data.table_name;
         // 去掉 sys_ 前缀得到资源名
@@ -339,6 +331,6 @@ impl GeneratorHistoryService {
             "fields": fields_json
         });
 
-        Ok(serde_json::to_string_pretty(&config)?)
+        Ok(serde_json::to_string_pretty(&config).map_err(|e| ServiceError::BadRequest(e.to_string()))?)
     }
 }

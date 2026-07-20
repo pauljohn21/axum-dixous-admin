@@ -1,17 +1,15 @@
-use anyhow::{anyhow, Result};
-use sea_orm::{ActiveModelTrait, ColumnTrait, EntityTrait, PaginatorTrait, QueryFilter, QuerySelect, Set, TransactionTrait};
+use sea_orm::{ActiveModelTrait, ColumnTrait, DatabaseConnection, EntityTrait, PaginatorTrait, QueryFilter, QuerySelect, Set, TransactionTrait};
 
 use model::dao::sys_menu;
 use model::dto::page_dto::{PageRequest, PageResponse};
 use model::dto::sys_menu_dto::{SysMenuInsertDTO, SysMenuUpdateDTO};
 use model::prelude::SysMenu;
-use utils::db_conn;
+use utils::prelude::ServiceError;
 
 pub struct SysMenuService;
 
 impl SysMenuService {
-    pub async fn insert(data: SysMenuInsertDTO) -> Result<sys_menu::Model> {
-        let db = db_conn!();
+    pub async fn insert(db: &DatabaseConnection, data: SysMenuInsertDTO) -> Result<sys_menu::Model, ServiceError> {
         let active = sys_menu::ActiveModel {
             menu_level: Set(data.menu_level),
             parent_id: Set(data.parent_id),
@@ -29,11 +27,10 @@ impl SysMenuService {
             ..Default::default()
         };
         let result = SysMenu::insert(active).exec(db).await?;
-        Self::get_by_id(result.last_insert_id).await
+        Self::get_by_id(db, result.last_insert_id).await
     }
 
-    pub async fn list(query: PageRequest) -> Result<PageResponse<sys_menu::Model>> {
-        let db = db_conn!();
+    pub async fn list(db: &DatabaseConnection, query: PageRequest) -> Result<PageResponse<sys_menu::Model>, ServiceError> {
         let page = query.page.unwrap_or(1);
         let page_size = query.page_size.unwrap_or(10);
 
@@ -51,19 +48,18 @@ impl SysMenuService {
         Ok(PageResponse { list, total, page, page_size })
     }
 
-    pub async fn get_by_id(id: i32) -> Result<sys_menu::Model> {
+    pub async fn get_by_id(db: &DatabaseConnection, id: i32) -> Result<sys_menu::Model, ServiceError> {
         SysMenu::find_by_id(id)
-            .one(db_conn!())
+            .one(db)
             .await?
-            .ok_or_else(|| anyhow!("菜单不存在"))
+            .ok_or_else(|| ServiceError::NotFound("菜单不存在".into()))
     }
 
-    pub async fn update(id: i32, data: SysMenuUpdateDTO) -> Result<sys_menu::Model> {
-        let db = db_conn!();
+    pub async fn update(db: &DatabaseConnection, id: i32, data: SysMenuUpdateDTO) -> Result<sys_menu::Model, ServiceError> {
         let menu: sys_menu::ActiveModel = SysMenu::find_by_id(id)
             .one(db)
             .await?
-            .ok_or_else(|| anyhow!("菜单不存在"))?
+            .ok_or_else(|| ServiceError::NotFound("菜单不存在".into()))?
             .into();
         let mut updated = menu;
         if let Some(v) = data.menu_level { updated.menu_level = Set(Some(v)); }
@@ -78,8 +74,7 @@ impl SysMenuService {
         Ok(updated.update(db).await?)
     }
 
-    pub async fn delete(id: i32) -> Result<()> {
-        let db = db_conn!();
+    pub async fn delete(db: &DatabaseConnection, id: i32) -> Result<(), ServiceError> {
         let txn = db.begin().await?;
 
         // 清理角色-菜单关联
@@ -111,9 +106,7 @@ impl SysMenuService {
 
     /// 根据用户名查询菜单列表
     /// admin 用户返回所有可见菜单，其他用户通过角色关联查询
-    pub async fn get_menus_by_username(username: &str) -> Result<Vec<sys_menu::Model>> {
-        let db = db_conn!();
-
+    pub async fn get_menus_by_username(db: &DatabaseConnection, username: &str) -> Result<Vec<sys_menu::Model>, ServiceError> {
         // admin 用户直接返回所有可见菜单
         if username == "admin" {
             let mut menus: Vec<sys_menu::Model> = SysMenu::find()
@@ -136,7 +129,7 @@ impl SysMenuService {
             .filter(model::dao::sys_user::Column::Username.eq(username))
             .one(db)
             .await?
-            .ok_or_else(|| anyhow!("用户不存在"))?;
+            .ok_or(ServiceError::UserNotFound)?;
 
         let user_roles = SysUserRole::find()
             .filter(sys_user_role::Column::UserId.eq(user.user_id))

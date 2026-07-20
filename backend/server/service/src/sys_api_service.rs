@@ -1,17 +1,15 @@
-use anyhow::{anyhow, Result};
-use sea_orm::{ActiveModelTrait, ColumnTrait, EntityTrait, PaginatorTrait, QueryFilter, QuerySelect, Set};
+use sea_orm::{ActiveModelTrait, ColumnTrait, DatabaseConnection, EntityTrait, PaginatorTrait, QueryFilter, QuerySelect, Set};
 
 use model::dao::sys_apis;
 use model::dto::page_dto::{PageRequest, PageResponse};
 use model::dto::sys_api_dto::{SysApiInsertDTO, SysApiUpdateDTO};
 use model::prelude::SysApis;
-use utils::db_conn;
+use utils::prelude::ServiceError;
 
 pub struct SysApiService;
 
 impl SysApiService {
-    pub async fn insert(data: SysApiInsertDTO) -> Result<sys_apis::Model> {
-        let db = db_conn!();
+    pub async fn insert(db: &DatabaseConnection, data: SysApiInsertDTO) -> Result<sys_apis::Model, ServiceError> {
         let active = sys_apis::ActiveModel {
             path: Set(data.path),
             description: Set(data.description),
@@ -20,11 +18,10 @@ impl SysApiService {
             ..Default::default()
         };
         let result = SysApis::insert(active).exec(db).await?;
-        Self::get_by_id(result.last_insert_id).await
+        Self::get_by_id(db, result.last_insert_id).await
     }
 
-    pub async fn list(query: PageRequest) -> Result<PageResponse<sys_apis::Model>> {
-        let db = db_conn!();
+    pub async fn list(db: &DatabaseConnection, query: PageRequest) -> Result<PageResponse<sys_apis::Model>, ServiceError> {
         let page = query.page.unwrap_or(1);
         let page_size = query.page_size.unwrap_or(10);
 
@@ -43,19 +40,18 @@ impl SysApiService {
         Ok(PageResponse { list, total, page, page_size })
     }
 
-    pub async fn get_by_id(id: i64) -> Result<sys_apis::Model> {
+    pub async fn get_by_id(db: &DatabaseConnection, id: i64) -> Result<sys_apis::Model, ServiceError> {
         SysApis::find_by_id(id)
-            .one(db_conn!())
+            .one(db)
             .await?
-            .ok_or_else(|| anyhow!("API不存在"))
+            .ok_or_else(|| ServiceError::NotFound("API不存在".into()))
     }
 
-    pub async fn update(id: i64, data: SysApiUpdateDTO) -> Result<sys_apis::Model> {
-        let db = db_conn!();
+    pub async fn update(db: &DatabaseConnection, id: i64, data: SysApiUpdateDTO) -> Result<sys_apis::Model, ServiceError> {
         let api: sys_apis::ActiveModel = SysApis::find_by_id(id)
             .one(db)
             .await?
-            .ok_or_else(|| anyhow!("API不存在"))?
+            .ok_or_else(|| ServiceError::NotFound("API不存在".into()))?
             .into();
         let mut updated = api;
         if let Some(v) = data.path { updated.path = Set(Some(v)); }
@@ -65,8 +61,8 @@ impl SysApiService {
         Ok(updated.update(db).await?)
     }
 
-    pub async fn delete(id: i64) -> Result<()> {
-        SysApis::delete_by_id(id).exec(db_conn!()).await?;
+    pub async fn delete(db: &DatabaseConnection, id: i64) -> Result<(), ServiceError> {
+        SysApis::delete_by_id(id).exec(db).await?;
         Ok(())
     }
 }

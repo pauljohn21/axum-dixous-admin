@@ -1,17 +1,15 @@
-use anyhow::{anyhow, Result};
-use sea_orm::{ActiveModelTrait, ColumnTrait, EntityTrait, PaginatorTrait, QueryFilter, QuerySelect, Set};
+use sea_orm::{ActiveModelTrait, ColumnTrait, DatabaseConnection, EntityTrait, PaginatorTrait, QueryFilter, QuerySelect, Set};
 
 use model::dao::sys_operation_records;
 use model::dto::page_dto::{PageRequest, PageResponse};
 use model::dto::sys_operation_record_dto::{SysOperationRecordInsertDTO, SysOperationRecordUpdateDTO};
 use model::prelude::SysOperationRecords;
-use utils::db_conn;
+use utils::prelude::ServiceError;
 
 pub struct SysOperationRecordService;
 
 impl SysOperationRecordService {
-    pub async fn insert(data: SysOperationRecordInsertDTO) -> Result<sys_operation_records::Model> {
-        let db = db_conn!();
+    pub async fn insert(db: &DatabaseConnection, data: SysOperationRecordInsertDTO) -> Result<sys_operation_records::Model, ServiceError> {
         let active = sys_operation_records::ActiveModel {
             ip: Set(data.ip),
             method: Set(data.method),
@@ -26,11 +24,10 @@ impl SysOperationRecordService {
             ..Default::default()
         };
         let result = SysOperationRecords::insert(active).exec(db).await?;
-        Self::get_by_id(result.last_insert_id).await
+        Self::get_by_id(db, result.last_insert_id).await
     }
 
-    pub async fn list(query: PageRequest) -> Result<PageResponse<sys_operation_records::Model>> {
-        let db = db_conn!();
+    pub async fn list(db: &DatabaseConnection, query: PageRequest) -> Result<PageResponse<sys_operation_records::Model>, ServiceError> {
         let page = query.page.unwrap_or(1);
         let page_size = query.page_size.unwrap_or(10);
 
@@ -49,19 +46,18 @@ impl SysOperationRecordService {
         Ok(PageResponse { list, total, page, page_size })
     }
 
-    pub async fn get_by_id(id: u64) -> Result<sys_operation_records::Model> {
+    pub async fn get_by_id(db: &DatabaseConnection, id: u64) -> Result<sys_operation_records::Model, ServiceError> {
         SysOperationRecords::find_by_id(id)
-            .one(db_conn!())
+            .one(db)
             .await?
-            .ok_or_else(|| anyhow!("操作记录不存在"))
+            .ok_or_else(|| ServiceError::NotFound("操作记录不存在".into()))
     }
 
-    pub async fn update(id: u64, data: SysOperationRecordUpdateDTO) -> Result<sys_operation_records::Model> {
-        let db = db_conn!();
+    pub async fn update(db: &DatabaseConnection, id: u64, data: SysOperationRecordUpdateDTO) -> Result<sys_operation_records::Model, ServiceError> {
         let record: sys_operation_records::ActiveModel = SysOperationRecords::find_by_id(id)
             .one(db)
             .await?
-            .ok_or_else(|| anyhow!("操作记录不存在"))?
+            .ok_or_else(|| ServiceError::NotFound("操作记录不存在".into()))?
             .into();
         let mut updated = record;
         if let Some(v) = data.ip { updated.ip = Set(Some(v)); }
@@ -77,8 +73,8 @@ impl SysOperationRecordService {
         Ok(updated.update(db).await?)
     }
 
-    pub async fn delete(id: u64) -> Result<()> {
-        SysOperationRecords::delete_by_id(id).exec(db_conn!()).await?;
+    pub async fn delete(db: &DatabaseConnection, id: u64) -> Result<(), ServiceError> {
+        SysOperationRecords::delete_by_id(id).exec(db).await?;
         Ok(())
     }
 }

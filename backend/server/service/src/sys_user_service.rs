@@ -1,5 +1,4 @@
-use anyhow::{anyhow, Result};
-use sea_orm::{ActiveModelTrait, ColumnTrait, EntityTrait, PaginatorTrait, QueryFilter, QuerySelect, Set, TransactionTrait};
+use sea_orm::{ActiveModelTrait, ColumnTrait, DatabaseConnection, EntityTrait, PaginatorTrait, QueryFilter, QuerySelect, Set, TransactionTrait};
 use serde::Deserialize;
 use tracing::error;
 
@@ -9,16 +8,14 @@ use model::dto::page_dto::{PageRequest, PageResponse};
 use model::dto::sys_user_dto::{LoginDTO, SysUserInsertDTO, SysUserUpdateDTO};
 use model::dto::sys_user_role::SysUserRoleAddDto;
 use model::prelude::SysUser;
-use utils::db_conn;
-use utils::prelude::{CONFIG, PasswordUtils};
+use utils::prelude::{CONFIG, PasswordUtils, ServiceError};
 
 use crate::sys_user_role_service::SysUserRoleService;
 
 pub struct SysUserService;
 
 impl SysUserService {
-    pub async fn insert(data: SysUserInsertDTO) -> Result<()> {
-        let db = db_conn!();
+    pub async fn insert(db: &DatabaseConnection, data: SysUserInsertDTO) -> Result<(), ServiceError> {
         let txn = db.begin().await?;
         let hash = PasswordUtils::encrypt(&data.password);
 
@@ -45,27 +42,26 @@ impl SysUserService {
         Ok(())
     }
 
-    pub async fn login(data: LoginDTO) -> Result<sys_user::Model> {
+    pub async fn login(db: &DatabaseConnection, data: LoginDTO) -> Result<sys_user::Model, ServiceError> {
         let user = SysUser::find()
             .filter(sys_user::Column::Username.eq(data.username.as_str()))
-            .one(db_conn!())
+            .one(db)
             .await?
-            .ok_or_else(|| anyhow!("无此用户"))?;
+            .ok_or(ServiceError::UserNotFound)?;
         PasswordUtils::verify(&data.password, &user.password.clone().unwrap_or_default(), &user.salt.clone().unwrap_or_default())
-            .map_err(|_| anyhow!("密码错误"))?;
+            .map_err(|_| ServiceError::InvalidPassword)?;
         Ok(user)
     }
 
-    pub async fn user_info(username: String) -> Result<sys_user::Model> {
+    pub async fn user_info(db: &DatabaseConnection, username: String) -> Result<sys_user::Model, ServiceError> {
         SysUser::find()
             .filter(sys_user::Column::Username.eq(username))
-            .one(db_conn!())
+            .one(db)
             .await?
-            .ok_or_else(|| anyhow!("无此用户"))
+            .ok_or(ServiceError::UserNotFound)
     }
 
-    pub async fn list(query: PageRequest) -> Result<PageResponse<sys_user::Model>> {
-        let db = db_conn!();
+    pub async fn list(db: &DatabaseConnection, query: PageRequest) -> Result<PageResponse<sys_user::Model>, ServiceError> {
         let page = query.page.unwrap_or(1);
         let page_size = query.page_size.unwrap_or(10);
 
@@ -84,19 +80,18 @@ impl SysUserService {
         Ok(PageResponse { list, total, page, page_size })
     }
 
-    pub async fn get_by_id(id: i32) -> Result<sys_user::Model> {
+    pub async fn get_by_id(db: &DatabaseConnection, id: i32) -> Result<sys_user::Model, ServiceError> {
         SysUser::find_by_id(id)
-            .one(db_conn!())
+            .one(db)
             .await?
-            .ok_or_else(|| anyhow!("用户不存在"))
+            .ok_or(ServiceError::UserNotFound)
     }
 
-    pub async fn update(id: i32, data: SysUserUpdateDTO) -> Result<sys_user::Model> {
-        let db = db_conn!();
+    pub async fn update(db: &DatabaseConnection, id: i32, data: SysUserUpdateDTO) -> Result<sys_user::Model, ServiceError> {
         let user: ActiveModel = SysUser::find_by_id(id)
             .one(db)
             .await?
-            .ok_or_else(|| anyhow!("用户不存在"))?
+            .ok_or(ServiceError::UserNotFound)?
             .into();
         let mut updated = user;
         if let Some(v) = data.nick_name { updated.nick_name = Set(Some(v)); }
@@ -109,17 +104,16 @@ impl SysUserService {
     }
 
     /// 修改密码
-    pub async fn change_password(username: &str, old_password: String, new_password: String) -> Result<()> {
-        let db = db_conn!();
+    pub async fn change_password(db: &DatabaseConnection, username: &str, old_password: String, new_password: String) -> Result<(), ServiceError> {
         let user = SysUser::find()
             .filter(sys_user::Column::Username.eq(username))
             .one(db)
             .await?
-            .ok_or_else(|| anyhow!("用户不存在"))?;
+            .ok_or(ServiceError::UserNotFound)?;
 
         // 验证旧密码
         PasswordUtils::verify(&old_password, &user.password.clone().unwrap_or_default(), &user.salt.clone().unwrap_or_default())
-            .map_err(|_| anyhow!("原密码错误"))?;
+            .map_err(|_| ServiceError::InvalidPassword)?;
 
         // 加密新密码
         let hash = PasswordUtils::encrypt(&new_password);
@@ -132,8 +126,7 @@ impl SysUserService {
     }
 
     /// 删除用户并清理关联数据 (sys_user_role)
-    pub async fn delete(id: i32) -> Result<()> {
-        let db = db_conn!();
+    pub async fn delete(db: &DatabaseConnection, id: i32) -> Result<(), ServiceError> {
         let txn = db.begin().await?;
 
         // 清理用户-角色关联
@@ -150,12 +143,11 @@ impl SysUserService {
     }
 
     /// 微信登录 — 通过 wx.login 的 code 换取 openid，查找或自动注册用户
-    pub async fn wx_login(code: &str) -> Result<sys_user::Model> {
+    pub async fn wx_login(db: &DatabaseConnection, code: &str) -> Result<sys_user::Model, ServiceError> {
         // 1. 调用微信 code2Session 接口获取 openid
         let openid = Self::code2session(code).await?;
 
         // 2. 根据 openid 查找用户
-        let db = db_conn!();
         if let Some(user) = SysUser::find()
             .filter(sys_user::Column::WxOpenid.eq(&openid))
             .one(db)
@@ -184,14 +176,13 @@ impl SysUserService {
         SysUser::find_by_id(saved.last_insert_id)
             .one(db)
             .await?
-            .ok_or_else(|| anyhow!("微信用户注册失败"))
+            .ok_or(ServiceError::UserNotFound)
     }
 
     /// 微信绑定 — 将当前登录用户绑定到微信 openid
     /// 如果该 openid 已被其他用户绑定，则返回错误
-    pub async fn wx_bind(username: &str, code: &str) -> Result<()> {
+    pub async fn wx_bind(db: &DatabaseConnection, username: &str, code: &str) -> Result<(), ServiceError> {
         let openid = Self::code2session(code).await?;
-        let db = db_conn!();
 
         // 检查 openid 是否已被其他用户绑定
         if let Some(existing) = SysUser::find()
@@ -200,7 +191,7 @@ impl SysUserService {
             .await?
         {
             if existing.username.as_deref() != Some(username) {
-                return Err(anyhow!("该微信号已绑定其他账号"));
+                return Err(ServiceError::WechatAlreadyBound);
             }
             // 已经绑定的是当前用户，无需重复操作
             return Ok(());
@@ -211,7 +202,7 @@ impl SysUserService {
             .filter(sys_user::Column::Username.eq(username))
             .one(db)
             .await?
-            .ok_or_else(|| anyhow!("用户不存在"))?;
+            .ok_or(ServiceError::UserNotFound)?;
 
         let mut active: ActiveModel = user.into();
         active.wx_openid = Set(Some(openid));
@@ -220,7 +211,7 @@ impl SysUserService {
     }
 
     /// 调用微信 code2Session 接口 — 用 code 换取 openid + session_key
-    async fn code2session(code: &str) -> Result<String> {
+    async fn code2session(code: &str) -> Result<String, ServiceError> {
         /// 微信 code2Session 响应体
         #[derive(Deserialize)]
         struct WxSessionResp {
@@ -240,22 +231,21 @@ impl SysUserService {
 
         let resp: WxSessionResp = reqwest::get(&url)
             .await
-            .map_err(|e| anyhow!("请求微信接口失败: {}", e))?
+            .map_err(|e| ServiceError::WechatApi(e.to_string()))?
             .json()
             .await
-            .map_err(|e| anyhow!("解析微信响应失败: {}", e))?;
+            .map_err(|e| ServiceError::WechatApi(e.to_string()))?;
 
         if resp.errcode != 0 {
             error!("微信 code2Session 错误: {} - {}", resp.errcode, resp.errmsg);
-            return Err(anyhow!("微信登录失败: {}", resp.errmsg));
+            return Err(ServiceError::WechatApi(resp.errmsg));
         }
 
-        resp.openid.ok_or_else(|| anyhow!("微信返回 openid 为空"))
+        resp.openid.ok_or_else(|| ServiceError::WechatApi("openid 为空".into()))
     }
 
     /// 仪表盘统计数据
-    pub async fn dashboard_stats() -> Result<crate::DashboardStats> {
-        let db = db_conn!();
+    pub async fn dashboard_stats(db: &DatabaseConnection) -> Result<crate::DashboardStats, ServiceError> {
         let user_count = SysUser::find().count(db).await?;
         let role_count = model::prelude::SysRole::find().count(db).await?;
         let menu_count = model::prelude::SysMenu::find().count(db).await?;

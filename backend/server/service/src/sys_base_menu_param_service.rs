@@ -1,17 +1,15 @@
-use anyhow::{anyhow, Result};
-use sea_orm::{ActiveModelTrait, ColumnTrait, EntityTrait, PaginatorTrait, QueryFilter, QuerySelect, Set};
+use sea_orm::{ActiveModelTrait, ColumnTrait, DatabaseConnection, EntityTrait, PaginatorTrait, QueryFilter, QuerySelect, Set};
 
 use model::dao::sys_base_menu_parameters;
 use model::dto::page_dto::{PageRequest, PageResponse};
 use model::dto::sys_base_menu_param_dto::{SysBaseMenuParamInsertDTO, SysBaseMenuParamUpdateDTO};
 use model::prelude::SysBaseMenuParameters;
-use utils::db_conn;
+use utils::prelude::ServiceError;
 
 pub struct SysBaseMenuParamService;
 
 impl SysBaseMenuParamService {
-    pub async fn insert(data: SysBaseMenuParamInsertDTO) -> Result<sys_base_menu_parameters::Model> {
-        let db = db_conn!();
+    pub async fn insert(db: &DatabaseConnection, data: SysBaseMenuParamInsertDTO) -> Result<sys_base_menu_parameters::Model, ServiceError> {
         let active = sys_base_menu_parameters::ActiveModel {
             sys_base_menu_id: Set(data.sys_base_menu_id),
             r#type: Set(data.r#type),
@@ -20,11 +18,10 @@ impl SysBaseMenuParamService {
             ..Default::default()
         };
         let result = SysBaseMenuParameters::insert(active).exec(db).await?;
-        Self::get_by_id(result.last_insert_id).await
+        Self::get_by_id(db, result.last_insert_id).await
     }
 
-    pub async fn list(query: PageRequest) -> Result<PageResponse<sys_base_menu_parameters::Model>> {
-        let db = db_conn!();
+    pub async fn list(db: &DatabaseConnection, query: PageRequest) -> Result<PageResponse<sys_base_menu_parameters::Model>, ServiceError> {
         let page = query.page.unwrap_or(1);
         let page_size = query.page_size.unwrap_or(10);
 
@@ -42,19 +39,18 @@ impl SysBaseMenuParamService {
         Ok(PageResponse { list, total, page, page_size })
     }
 
-    pub async fn get_by_id(id: u64) -> Result<sys_base_menu_parameters::Model> {
+    pub async fn get_by_id(db: &DatabaseConnection, id: u64) -> Result<sys_base_menu_parameters::Model, ServiceError> {
         SysBaseMenuParameters::find_by_id(id)
-            .one(db_conn!())
+            .one(db)
             .await?
-            .ok_or_else(|| anyhow!("菜单参数不存在"))
+            .ok_or_else(|| ServiceError::NotFound("菜单参数不存在".into()))
     }
 
-    pub async fn update(id: u64, data: SysBaseMenuParamUpdateDTO) -> Result<sys_base_menu_parameters::Model> {
-        let db = db_conn!();
+    pub async fn update(db: &DatabaseConnection, id: u64, data: SysBaseMenuParamUpdateDTO) -> Result<sys_base_menu_parameters::Model, ServiceError> {
         let param: sys_base_menu_parameters::ActiveModel = SysBaseMenuParameters::find_by_id(id)
             .one(db)
             .await?
-            .ok_or_else(|| anyhow!("菜单参数不存在"))?
+            .ok_or_else(|| ServiceError::NotFound("菜单参数不存在".into()))?
             .into();
         let mut updated = param;
         if let Some(v) = data.sys_base_menu_id { updated.sys_base_menu_id = Set(Some(v)); }
@@ -64,8 +60,8 @@ impl SysBaseMenuParamService {
         Ok(updated.update(db).await?)
     }
 
-    pub async fn delete(id: u64) -> Result<()> {
-        SysBaseMenuParameters::delete_by_id(id).exec(db_conn!()).await?;
+    pub async fn delete(db: &DatabaseConnection, id: u64) -> Result<(), ServiceError> {
+        SysBaseMenuParameters::delete_by_id(id).exec(db).await?;
         Ok(())
     }
 }

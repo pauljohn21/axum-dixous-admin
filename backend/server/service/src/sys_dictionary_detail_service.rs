@@ -1,17 +1,15 @@
-use anyhow::{anyhow, Result};
-use sea_orm::{ActiveModelTrait, ColumnTrait, EntityTrait, PaginatorTrait, QueryFilter, QuerySelect, Set};
+use sea_orm::{ActiveModelTrait, ColumnTrait, DatabaseConnection, EntityTrait, PaginatorTrait, QueryFilter, QuerySelect, Set};
 
 use model::dao::sys_dictionary_details;
 use model::dto::page_dto::{PageRequest, PageResponse};
 use model::dto::sys_dictionary_detail_dto::{SysDictionaryDetailInsertDTO, SysDictionaryDetailUpdateDTO};
 use model::prelude::SysDictionaryDetails;
-use utils::db_conn;
+use utils::prelude::ServiceError;
 
 pub struct SysDictionaryDetailService;
 
 impl SysDictionaryDetailService {
-    pub async fn insert(data: SysDictionaryDetailInsertDTO) -> Result<sys_dictionary_details::Model> {
-        let db = db_conn!();
+    pub async fn insert(db: &DatabaseConnection, data: SysDictionaryDetailInsertDTO) -> Result<sys_dictionary_details::Model, ServiceError> {
         let active = sys_dictionary_details::ActiveModel {
             label: Set(data.label),
             value: Set(data.value),
@@ -22,11 +20,10 @@ impl SysDictionaryDetailService {
             ..Default::default()
         };
         let result = SysDictionaryDetails::insert(active).exec(db).await?;
-        Self::get_by_id(result.last_insert_id).await
+        Self::get_by_id(db, result.last_insert_id).await
     }
 
-    pub async fn list(query: PageRequest) -> Result<PageResponse<sys_dictionary_details::Model>> {
-        let db = db_conn!();
+    pub async fn list(db: &DatabaseConnection, query: PageRequest) -> Result<PageResponse<sys_dictionary_details::Model>, ServiceError> {
         let page = query.page.unwrap_or(1);
         let page_size = query.page_size.unwrap_or(10);
 
@@ -44,19 +41,18 @@ impl SysDictionaryDetailService {
         Ok(PageResponse { list, total, page, page_size })
     }
 
-    pub async fn get_by_id(id: u64) -> Result<sys_dictionary_details::Model> {
+    pub async fn get_by_id(db: &DatabaseConnection, id: u64) -> Result<sys_dictionary_details::Model, ServiceError> {
         SysDictionaryDetails::find_by_id(id)
-            .one(db_conn!())
+            .one(db)
             .await?
-            .ok_or_else(|| anyhow!("字典详情不存在"))
+            .ok_or_else(|| ServiceError::NotFound("字典详情不存在".into()))
     }
 
-    pub async fn update(id: u64, data: SysDictionaryDetailUpdateDTO) -> Result<sys_dictionary_details::Model> {
-        let db = db_conn!();
+    pub async fn update(db: &DatabaseConnection, id: u64, data: SysDictionaryDetailUpdateDTO) -> Result<sys_dictionary_details::Model, ServiceError> {
         let detail: sys_dictionary_details::ActiveModel = SysDictionaryDetails::find_by_id(id)
             .one(db)
             .await?
-            .ok_or_else(|| anyhow!("字典详情不存在"))?
+            .ok_or_else(|| ServiceError::NotFound("字典详情不存在".into()))?
             .into();
         let mut updated = detail;
         if let Some(v) = data.label { updated.label = Set(Some(v)); }
@@ -68,8 +64,8 @@ impl SysDictionaryDetailService {
         Ok(updated.update(db).await?)
     }
 
-    pub async fn delete(id: u64) -> Result<()> {
-        SysDictionaryDetails::delete_by_id(id).exec(db_conn!()).await?;
+    pub async fn delete(db: &DatabaseConnection, id: u64) -> Result<(), ServiceError> {
+        SysDictionaryDetails::delete_by_id(id).exec(db).await?;
         Ok(())
     }
 }
