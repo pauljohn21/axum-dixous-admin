@@ -1,9 +1,14 @@
 use std::sync::Arc;
+use std::time::Duration;
 
+use axum::http::StatusCode;
 use axum::Router;
 use auth_layer::AuthLayer;
 use casbin::{CachedEnforcer, CoreApi};
 use tower_http::cors::CorsLayer;
+use tower_http::compression::CompressionLayer;
+use tower_http::timeout::TimeoutLayer;
+use tower_http::trace::TraceLayer;
 use tracing::info;
 
 use migration::Migrator;
@@ -44,8 +49,11 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let auth_layer = AuthLayer::new(enforcer);
 
-    // CORS
+    // 中间件链
     let cors = CorsLayer::very_permissive();
+    let compression = CompressionLayer::new();
+    let timeout = TimeoutLayer::with_status_code(StatusCode::REQUEST_TIMEOUT, Duration::from_secs(30));
+    let trace = TraceLayer::new_for_http();
 
     // 路由
     let app = Router::new()
@@ -56,14 +64,47 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 .with_state(state.clone())
                 .layer(auth_layer),
         )
-        .layer(cors);
+        .layer(cors)
+        .layer(compression)
+        .layer(timeout)
+        .layer(trace);
 
     let addr = CONFIG.server.clone().addr();
     info!("服务启动于 {}", addr);
     info!("Swagger UI : {}/", addr);
 
     let listener = tokio::net::TcpListener::bind(addr).await?;
-    axum::serve(listener, app).await?;
+    axum::serve(listener, app)
+        .with_graceful_shutdown(shutdown_signal())
+        .await?;
 
+    info!("服务已优雅关闭");
     Ok(())
+}
+
+/// 优雅关闭信号处理 — 捕获 Ctrl+C
+async fn shutdown_signal() {
+    let ctrl_c = async {
+        tokio::signal::ctrl_c()
+            .await
+            .expect("failed to install Ctrl+C handler");
+    };
+
+    #[cfg(unix)]
+    let terminate = async {
+        tokio::signal::unix::signal(tokio::signal::unix::SignalKind::terminate())
+            .expect("failed to install signal handler")
+            .recv()
+            .await;
+    };
+
+    #[cfg(not(unix))]
+    let terminate = std::future::pending::<()>();
+
+    tokio::select! {
+        _ = ctrl_c => {},
+        _ = terminate => {},
+    }
+
+    info!("收到关闭信号，正在优雅关闭...");
 }
