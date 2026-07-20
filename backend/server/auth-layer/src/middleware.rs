@@ -18,14 +18,16 @@ pub struct Username(pub String);
 pub struct AuthLayer {
     pub enforcer: Arc<RwLock<CachedEnforcer>>,
     pub redis: redis::aio::ConnectionManager,
+    pub domain: String,
 }
 
 impl AuthLayer {
     pub fn new(
         enforcer: Arc<RwLock<CachedEnforcer>>,
         redis: redis::aio::ConnectionManager,
+        domain: String,
     ) -> Self {
-        Self { enforcer, redis }
+        Self { enforcer, redis, domain }
     }
 }
 
@@ -37,6 +39,7 @@ impl<S> Layer<S> for AuthLayer {
             inner,
             enforcer: self.enforcer.clone(),
             redis: self.redis.clone(),
+            domain: self.domain.clone(),
         }
     }
 }
@@ -46,6 +49,7 @@ pub struct AuthMiddleware<S> {
     inner: S,
     enforcer: Arc<RwLock<CachedEnforcer>>,
     redis: redis::aio::ConnectionManager,
+    domain: String,
 }
 
 impl<S> tower::Service<Request> for AuthMiddleware<S>
@@ -74,6 +78,7 @@ where
         let method = req.method().clone();
         let enforcer = self.enforcer.clone();
         let redis = self.redis.clone();
+        let domain = self.domain.clone();
 
         // 1. JWT 验证
         let token_info = if let Some(header) = auth_header {
@@ -114,7 +119,7 @@ where
                 return Ok(StatusCode::UNAUTHORIZED.into_response());
             }
 
-            let args = vec![subject, path, action];
+            let args = vec![subject, path, action, domain];
             let result = {
                 let guard = enforcer.read().await;
                 guard.enforce(args)
