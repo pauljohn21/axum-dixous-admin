@@ -4,6 +4,7 @@
     "pages/dashboard/dashboard",
     "pages/users/users",
     "pages/roles/roles",
+    "pages/menus/menus",
     "pages/profile/profile"
   ],
   "window": {
