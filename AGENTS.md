@@ -188,11 +188,11 @@ pub struct AppState {
 
 #### 数据库连接
 
-- **推荐方式**: 通过 `State<AppState>` 注入，handler 内使用 `&state.db`
-- **旧方式** (过渡保留): `db_conn!()` 宏获取全局连接 — `let db = db_conn!();`
-- 宏展开为 `utils::prelude::DB::db_connection().await`
-- **Redis 连接**: `DB::redis_connection().await` 获取 `&'static ConnectionManager`，或通过 `state.redis` 访问
+- **统一方式**: 通过 `State<AppState>` 注入，handler 内使用 `&state.db`
 - Service 层函数签名: `pub async fn xxx(db: &DatabaseConnection, ...) -> Result<T, ServiceError>`
+- **Redis 连接**: 通过 `state.redis` 访问，或 `DB::redis_connection().await` 获取 `&'static ConnectionManager`
+- **Casbin Enforcer**: 通过 `state.enforcer` 访问（`Arc<RwLock<CachedEnforcer>>`），Service 层需要传参: `pub async fn delete(db: &DatabaseConnection, enforcer: &Arc<RwLock<CachedEnforcer>>, id: i32) -> Result<(), ServiceError>`
+- **HTTP 客户端**: 通过 `state.http_client` 访问（微信 API 调用等），Service 层需要传参
 
 #### 统一响应
 
@@ -422,6 +422,84 @@ cd web && dx build --release && docker compose up -d
 | Adminer | 8090 | 数据库管理 |
 | Backend | 8888 | API + Swagger UI |
 | Nginx | 80 | 前端 + API 代理 |
+
+## 测试体系
+
+### 测试分层
+
+| 层级 | 说明 | 文件 |
+|------|------|------|
+| L2 Mock | Trait + Mock 实现，不碰 DB | `backend/tests/api_tests.rs` |
+| L3 集成 | 真实 MySQL + Redis，Service 层调用 | `backend/tests/integration_test.rs` |
+| L3 集成 | Casbin 权限规则测试 | `backend/tests/role_casbin_test.rs` |
+| L4 HTTP 路由 | `tower::ServiceExt::oneshot` 内存请求 | `backend/tests/http_route_test.rs` |
+| 前端单元 | 纯函数测试（i18n） | `web/crates/dioxus-i18n/src/lib.rs` |
+
+### 测试辅助模块
+
+`backend/tests/common/mod.rs` 提供:
+- `setup_test_state()` — 构建完整测试 AppState（连接 `scm_test` 数据库 + Redis DB 1）
+- `setup_test_db()` — 创建测试 DB 连接 + `Migrator::fresh()`
+- `insert_test_user(db)` — 插入测试用户 fixtures
+
+### 运行测试
+
+```bash
+# 全量测试（需要 MySQL + Redis 运行）
+cd backend && cargo test
+
+# 仅 Mock 测试（不需要 DB）
+cargo test --test api_tests
+
+# 前端测试
+cd web/crates/dioxus-i18n && cargo test
+```
+
+### 测试数据库
+
+- 测试使用独立数据库 `scm_test`（与开发库 `scm` 隔离）
+- Redis 使用 DB index 1（避免与开发环境 JWT 黑名单冲突）
+- 集成测试使用 `#[serial]` 串行执行，避免并发写入冲突
+
+## CI/CD
+
+### GitHub Actions
+
+CI 配置在 `.github/workflows/ci.yml`，触发条件: push/PR 到 main/master。
+
+| Job | 说明 |
+|-----|------|
+| `backend-check` | clippy (零 warning) + test (MySQL+Redis 服务容器) + build |
+| `frontend-check` | test (dioxus-i18n) + build (WASM) |
+| `docker-build` | 仅 push to main 时触发，构建 Docker 镜像 |
+
+### 本地验证
+
+提交前应运行:
+```bash
+cd backend && cargo clippy --all-targets -- -D warnings
+cd backend && cargo test
+cd web/crates/dioxus-i18n && cargo test
+```
+
+## 代码生成器
+
+### 使用方式
+
+1. 在前端「代码生成器」页面配置表名、资源名、字段列表
+2. 点击「预览代码」调用 `POST /api/generator/preview`
+3. `GeneratorCodeService::preview_code` 根据配置生成 8 个文件的完整代码:
+
+| 文件 | 类型 | 说明 |
+|------|------|------|
+| `m{ts}_create_{table}.rs` | 后端 | SeaORM 迁移脚本 |
+| `{resource}.rs` (dao) | 后端 | SeaORM 实体 |
+| `{resource}_dto.rs` | 后端 | 请求/响应 DTO |
+| `{resource}_service.rs` | 后端 | Service 层 CRUD |
+| `{resource}_api.rs` | 后端 | API 路由 + OpenAPI |
+| `{resource}.rs` (model) | 前端 | 数据模型 |
+| `{resource}.rs` (api) | 前端 | API 调用封装 |
+| `{resource}_manage.rs` | 前端 | 管理页面组件骨架 |
 
 ## Agent Skills
 
