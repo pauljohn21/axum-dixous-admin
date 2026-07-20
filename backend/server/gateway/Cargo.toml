@@ -17,6 +17,7 @@ casbin-adapter = { workspace = true }
 auth-layer = { workspace = true }
 # tower middleware
 tower-http = { workspace = true }
+tower_governor = { workspace = true }
 # service & api
 service = { path = "../service" }
 api = { path = "../api" }

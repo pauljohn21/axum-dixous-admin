@@ -10,6 +10,8 @@ use tower_http::cors::CorsLayer;
 use tower_http::compression::CompressionLayer;
 use tower_http::timeout::TimeoutLayer;
 use tower_http::trace::TraceLayer;
+use tower_governor::governor::GovernorConfigBuilder;
+use tower_governor::GovernorLayer;
 use tracing::{info, warn};
 
 use migration::Migrator;
@@ -91,6 +93,14 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let trace = TraceLayer::new_for_http();
     let body_limit = DefaultBodyLimit::max(2 * 1024 * 1024); // 2MB
 
+    // 限流: 全局 100 次/秒 (burst 100)
+    let governor_config = GovernorConfigBuilder::default()
+        .per_second(100)
+        .burst_size(100)
+        .finish()
+        .expect("Failed to build governor config");
+    info!("限流: 全局 100 次/秒, burst 100");
+
     // 路由
     let app = Router::new()
         .merge(api::public_routes().with_state(state.clone()))
@@ -100,6 +110,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 .with_state(state.clone())
                 .layer(auth_layer),
         )
+        .layer(GovernorLayer::new(governor_config))
         .layer(body_limit)
         .layer(cors)
         .layer(compression)
