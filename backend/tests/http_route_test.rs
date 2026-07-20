@@ -134,10 +134,11 @@ async fn test_protected_route_with_valid_token() {
     // 构建完整应用（公开 + 受保护路由 + AuthLayer）
     use auth_layer::AuthLayer;
     let app = api::public_routes()
-        .merge(api::protected_routes())
+        .merge(api::admin_routes())
         .layer(AuthLayer::new(
             state.enforcer.clone(),
             state.redis.clone(),
+            "admin".into(),
         ))
         .with_state(state.clone());
 
