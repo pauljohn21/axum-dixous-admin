@@ -8,7 +8,8 @@ use model::dao::sys_menu;
 use model::dto::page_dto::{PageRequest, PageResponse};
 use model::dto::sys_menu_dto::{SysMenuInsertDTO, SysMenuUpdateDTO};
 use service::sys_menu_service::SysMenuService;
-use utils::prelude::{AppError, R, AppState};
+use utils::cache::keys;
+use utils::prelude::{AppError, Cache, R, AppState};
 
 #[utoipa::path(
     post,
@@ -19,6 +20,8 @@ use utils::prelude::{AppError, R, AppState};
 )]
 pub async fn create(State(state): State<AppState>, Json(data): Json<SysMenuInsertDTO>) -> Result<impl IntoResponse, AppError> {
     let menu = SysMenuService::insert(&state.db, data).await?;
+    // 菜单变更，失效所有用户菜单缓存
+    Cache::del_pattern(&mut state.redis.clone(), &format!("{}*", keys::USER_MENUS_PREFIX)).await;
     Ok(R::ok(menu))
 }
 
@@ -56,6 +59,7 @@ pub async fn get_by_id(State(state): State<AppState>, Path(id): Path<i32>) -> Re
 )]
 pub async fn update(State(state): State<AppState>, Path(id): Path<i32>, Json(data): Json<SysMenuUpdateDTO>) -> Result<impl IntoResponse, AppError> {
     let menu = SysMenuService::update(&state.db, id, data).await?;
+    Cache::del_pattern(&mut state.redis.clone(), &format!("{}*", keys::USER_MENUS_PREFIX)).await;
     Ok(R::ok(menu))
 }
 
@@ -68,6 +72,7 @@ pub async fn update(State(state): State<AppState>, Path(id): Path<i32>, Json(dat
 )]
 pub async fn delete_menu(State(state): State<AppState>, Path(id): Path<i32>) -> Result<impl IntoResponse, AppError> {
     SysMenuService::delete(&state.db, id).await?;
+    Cache::del_pattern(&mut state.redis.clone(), &format!("{}*", keys::USER_MENUS_PREFIX)).await;
     Ok(R::ok(()))
 }
 
@@ -78,7 +83,7 @@ pub async fn delete_menu(State(state): State<AppState>, Path(id): Path<i32>) -> 
     tag = "菜单管理"
 )]
 pub async fn get_user_menus(State(state): State<AppState>, Extension(username): Extension<Username>) -> Result<impl IntoResponse, AppError> {
-    let menus = SysMenuService::get_menus_by_username(&state.db, &username.0)
+    let menus = SysMenuService::get_menus_with_cache(&state.db, &mut state.redis.clone(), &username.0)
         .await?;
     Ok(R::ok(menus))
 }

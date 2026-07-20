@@ -169,7 +169,7 @@ pub async fn delete_user(State(state): State<AppState>, Path(id): Path<i32>) -> 
 pub async fn get_user_info(State(state): State<AppState>, Extension(username): Extension<Username>) -> Result<impl IntoResponse, AppError> {
     // 查询完整用户信息
     let user = SysUserService::user_info(&state.db, username.0.clone()).await?;
-    let menus = SysMenuService::get_menus_by_username(&state.db, &username.0).await?;
+    let menus = SysMenuService::get_menus_with_cache(&state.db, &mut state.redis.clone(), &username.0).await?;
     Ok(R::ok(UserInfoResp {
         username: user.username.unwrap_or_default(),
         nick_name: user.nick_name,
