@@ -5,7 +5,7 @@
 use std::sync::Arc;
 
 use casbin::{CachedEnforcer, CoreApi};
-use sea_orm::{Database, DatabaseConnection};
+use sea_orm::{Database, DatabaseConnection, EntityTrait};
 use sea_orm_migration::MigratorTrait;
 use tokio::sync::RwLock;
 
