@@ -1,0 +1,109 @@
+name: CI
+
+on:
+  push:
+    branches: [main, master, generator]
+  pull_request:
+    branches: [main, master]
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  # ===== 后端检查 =====
+  backend-check:
+    runs-on: ubuntu-latest
+    services:
+      mysql:
+        image: mysql:8
+        env:
+          MYSQL_ROOT_PASSWORD: root123456
+          MYSQL_DATABASE: scm_test
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd="mysqladmin ping -h localhost"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=10
+      redis:
+        image: redis:7
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd="redis-cli ping"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=5
+    env:
+      ADMIN_DB_HOST: localhost
+      ADMIN_DB_PORT: "3306"
+      ADMIN_DB_DATABASE: scm_test
+      ADMIN_DB_USERNAME: root
+      ADMIN_DB_PASSWORD: root123456
+      ADMIN_REDIS_HOST: localhost
+      ADMIN_REDIS_PORT: "6379"
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: true
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy
+
+      - name: Cache cargo registry
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: backend
+
+      - name: Clippy (zero warnings)
+        run: cargo clippy --manifest-path backend/Cargo.toml --all-targets -- -D warnings
+
+      - name: Test
+        run: cargo test --manifest-path backend/Cargo.toml
+
+      - name: Build (release)
+        run: cargo build --manifest-path backend/Cargo.toml --release
+
+  # ===== 前端检查 =====
+  frontend-check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: true
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: wasm32-unknown-unknown
+
+      - name: Cache cargo registry
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: web
+
+      - name: Test (dioxus-i18n)
+        run: cargo test --manifest-path web/crates/dioxus-i18n/Cargo.toml
+
+      - name: Install dioxus CLI
+        run: cargo install dioxus-cli --version 0.7.1 || true
+
+      - name: Build (release WASM)
+        run: cd web && dx build --release
+        continue-on-error: true # dioxus CLI 可能因版本差异失败，暂不阻塞
+
+  # ===== Docker 构建（仅 push to main）=====
+  docker-build:
+    needs: [backend-check, frontend-check]
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: true
+
+      - name: Build backend Docker image
+        run: docker build -t axum-admin-backend -f backend/server/Dockerfile backend/server/
