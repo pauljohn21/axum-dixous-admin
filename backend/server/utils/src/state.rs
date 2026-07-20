@@ -19,6 +19,6 @@ pub struct AppState {
     pub http_client: reqwest::Client,
     /// 应用配置
     pub config: Config,
-    // P2 阶段追加:
-    // pub redis: redis::aio::ConnectionManager,
+    /// Redis 连接管理器（自动重连）
+    pub redis: redis::aio::ConnectionManager,
 }

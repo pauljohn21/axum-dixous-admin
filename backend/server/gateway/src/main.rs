@@ -30,12 +30,16 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // 构建 HTTP 客户端（复用连接池）
     let http_client = reqwest::Client::new();
 
+    // 初始化 Redis 连接管理器
+    let redis = utils::prelude::DB::redis_connection().await.clone();
+
     // 构建应用共享状态
     let state = AppState {
         db: db.clone(),
         enforcer: enforcer.clone(),
         http_client,
         config: CONFIG.clone(),
+        redis,
     };
 
     let auth_layer = AuthLayer::new(enforcer);

@@ -64,6 +64,8 @@ password-auth = "1.0.0"
 
 # jwt
 jsonwebtoken = "9.1.0"
+# Redis
+redis = { version = "0.27", features = ["tokio-comp", "connection-manager"] }
 #内部模块
 utils = { path = "server/utils" }
 model = { path = "server/data/model" }

@@ -47,6 +47,9 @@ reqwest = { workspace = true }
 # 权限
 casbin = { workspace = true }
 
+# Redis
+redis = { workspace = true }
+
 utoipa = { workspace = true }
 
 [dev-dependencies]

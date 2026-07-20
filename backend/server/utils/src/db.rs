@@ -11,6 +11,9 @@ use crate::prelude::CONFIG;
 /// 全局数据库连接 (OnceCell 保证只初始化一次)
 static DB_CONN: OnceCell<DatabaseConnection> = OnceCell::const_new();
 
+/// 全局 Redis 连接管理器 (OnceCell 保证只初始化一次)
+static REDIS_CONN: OnceCell<redis::aio::ConnectionManager> = OnceCell::const_new();
+
 #[derive(Debug, Clone, Serialize)]
 pub struct DB;
 
@@ -38,6 +41,19 @@ impl DB {
                 .idle_timeout(Duration::from_secs(CONFIG.datasource.config.idle_timeout))
                 .sqlx_logging_level(DB::sql_level());
             Database::connect(opt).await.expect("无法连接数据库")
+        }).await
+    }
+
+    /// 获取 Redis 连接管理器 (单例，自动重连)
+    pub async fn redis_connection() -> &'static redis::aio::ConnectionManager {
+        REDIS_CONN.get_or_init(|| async {
+            let url = if CONFIG.cache.password.is_empty() {
+                format!("redis://{}:{}/", CONFIG.cache.host, CONFIG.cache.port)
+            } else {
+                format!("redis://:{}@{}:{}/", CONFIG.cache.password, CONFIG.cache.host, CONFIG.cache.port)
+            };
+            let client = redis::Client::open(url).expect("无法创建 Redis 客户端");
+            client.get_connection_manager().await.expect("无法连接 Redis")
         }).await
     }
 }
