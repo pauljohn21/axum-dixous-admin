@@ -184,6 +184,10 @@ pub async fn login(
 }
 ```
 
+**路由返回类型变更：** `public_routes()` 和 `protected_routes()` 的返回类型从 `Router<()>` 变为 `Router<AppState>`。在 `gateway/src/main.rs` 中通过 `.with_state(state)` 注入。
+
+**AuthLayer 适配说明：** AuthLayer 是 `tower::Service` 实现，不是 Axum handler，无法直接提取 `State<AppState>`。因此 AuthLayer 始终使用构造器注入——P1 阶段通过 `AuthLayer::new(enforcer)` 传入 enforcer，P2 阶段追加 `AuthLayer::new(enforcer, redis)` 传入 Redis 连接。
+
 **过渡策略：**
 - `db_conn!()` 宏和 `service::enforcer` 保留但标记 `#[deprecated]`
 - P1 阶段逐文件迁移，确保编译通过后再删除全局静态变量
@@ -678,7 +682,7 @@ async-trait = "0.1"  # 已存在
 | P1 | 改造 | `api/src/*.rs` — 所有 handler 提取 State、传 db 参数 |
 | P1 | 改造 | `service/src/*.rs` — 所有 Service 函数签名变更 |
 | P1 | 改造 | `service/src/enforcer.rs` — 移除 set_enforcer 全局注入 |
-| P1 | 改造 | `auth-layer/src/middleware.rs` — 适配 State（或保持构造器注入） |
+| P1 | 改造 | `auth-layer/src/middleware.rs` — 保持构造器注入（AuthLayer 是 tower::Service，非 Axum handler，无法直接访问 State） |
 | P2 | 新增 | `utils/src/redis.rs` — Redis 连接管理 |
 | P2 | 改造 | `gateway/src/main.rs` — 中间件栈、优雅关闭、Redis 初始化 |
 | P2 | 改造 | `auth-layer/src/middleware.rs` — JWT 黑名单走 Redis |
