@@ -8,7 +8,7 @@ use model::dto::page_dto::{PageRequest, PageResponse};
 use model::dto::sys_user_dto::{LoginDTO, SysUserInsertDTO, SysUserUpdateDTO};
 use model::dto::sys_user_role::SysUserRoleAddDto;
 use model::prelude::SysUser;
-use utils::prelude::{CONFIG, PasswordUtils, ServiceError};
+use utils::prelude::{PasswordUtils, ServiceError, WechatConfig};
 
 use crate::sys_user_role_service::SysUserRoleService;
 
@@ -143,9 +143,14 @@ impl SysUserService {
     }
 
     /// 微信登录 — 通过 wx.login 的 code 换取 openid，查找或自动注册用户
-    pub async fn wx_login(db: &DatabaseConnection, code: &str) -> Result<sys_user::Model, ServiceError> {
+    pub async fn wx_login(
+        db: &DatabaseConnection,
+        http_client: &reqwest::Client,
+        wechat: &WechatConfig,
+        code: &str,
+    ) -> Result<sys_user::Model, ServiceError> {
         // 1. 调用微信 code2Session 接口获取 openid
-        let openid = Self::code2session(code).await?;
+        let openid = Self::code2session(http_client, wechat, code).await?;
 
         // 2. 根据 openid 查找用户
         if let Some(user) = SysUser::find()
@@ -181,8 +186,14 @@ impl SysUserService {
 
     /// 微信绑定 — 将当前登录用户绑定到微信 openid
     /// 如果该 openid 已被其他用户绑定，则返回错误
-    pub async fn wx_bind(db: &DatabaseConnection, username: &str, code: &str) -> Result<(), ServiceError> {
-        let openid = Self::code2session(code).await?;
+    pub async fn wx_bind(
+        db: &DatabaseConnection,
+        http_client: &reqwest::Client,
+        wechat: &WechatConfig,
+        username: &str,
+        code: &str,
+    ) -> Result<(), ServiceError> {
+        let openid = Self::code2session(http_client, wechat, code).await?;
 
         // 检查 openid 是否已被其他用户绑定
         if let Some(existing) = SysUser::find()
@@ -211,7 +222,11 @@ impl SysUserService {
     }
 
     /// 调用微信 code2Session 接口 — 用 code 换取 openid + session_key
-    async fn code2session(code: &str) -> Result<String, ServiceError> {
+    async fn code2session(
+        http_client: &reqwest::Client,
+        wechat: &WechatConfig,
+        code: &str,
+    ) -> Result<String, ServiceError> {
         /// 微信 code2Session 响应体
         #[derive(Deserialize)]
         struct WxSessionResp {
@@ -224,12 +239,14 @@ impl SysUserService {
 
         let url = format!(
             "https://api.weixin.qq.com/sns/jscode2session?appid={}&secret={}&js_code={}&grant_type=authorization_code",
-            CONFIG.wechat.appid,
-            CONFIG.wechat.secret,
+            wechat.appid,
+            wechat.secret,
             code
         );
 
-        let resp: WxSessionResp = reqwest::get(&url)
+        let resp: WxSessionResp = http_client
+            .get(&url)
+            .send()
             .await
             .map_err(|e| ServiceError::WechatApi(e.to_string()))?
             .json()

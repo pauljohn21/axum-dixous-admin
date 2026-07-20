@@ -71,7 +71,7 @@ pub async fn login(State(state): State<AppState>, Json(data): Json<LoginDTO>) ->
     tag = "用户管理"
 )]
 pub async fn wx_login(State(state): State<AppState>, Json(data): Json<WxLoginDTO>) -> Result<impl IntoResponse, AppError> {
-    let user = SysUserService::wx_login(&state.db, &data.code).await?;
+    let user = SysUserService::wx_login(&state.db, &state.http_client, &state.config.wechat, &data.code).await?;
     let token = create_token(&user.username.clone().unwrap_or_default())
         .map_err(|e| AppError::AuthError(e.to_string()))?;
     Ok(R::ok(LoginResp { token }))
@@ -196,7 +196,7 @@ pub async fn bind_wechat(
     Extension(username): Extension<Username>,
     Json(data): Json<WxBindDTO>,
 ) -> Result<impl IntoResponse, AppError> {
-    SysUserService::wx_bind(&state.db, &username.0, &data.code).await?;
+    SysUserService::wx_bind(&state.db, &state.http_client, &state.config.wechat, &username.0, &data.code).await?;
     Ok(R::ok(()))
 }
 

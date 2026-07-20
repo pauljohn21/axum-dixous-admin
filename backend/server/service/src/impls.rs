@@ -25,6 +25,8 @@ use crate::sys_api_service::SysApiService;
 
 pub struct UserServiceImpl {
     pub db: DatabaseConnection,
+    pub http_client: reqwest::Client,
+    pub wechat: utils::prelude::WechatConfig,
 }
 
 #[async_trait]
@@ -54,10 +56,10 @@ impl UserService for UserServiceImpl {
         SysUserService::change_password(&self.db, username, old, new).await
     }
     async fn wx_login(&self, code: &str) -> Result<sys_user::Model, ServiceError> {
-        SysUserService::wx_login(&self.db, code).await
+        SysUserService::wx_login(&self.db, &self.http_client, &self.wechat, code).await
     }
     async fn wx_bind(&self, username: &str, code: &str) -> Result<(), ServiceError> {
-        SysUserService::wx_bind(&self.db, username, code).await
+        SysUserService::wx_bind(&self.db, &self.http_client, &self.wechat, username, code).await
     }
     async fn dashboard_stats(&self) -> Result<DashboardStats, ServiceError> {
         let stats = SysUserService::dashboard_stats(&self.db).await?;
