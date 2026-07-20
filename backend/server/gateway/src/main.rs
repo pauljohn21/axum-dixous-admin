@@ -41,10 +41,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         enforcer: enforcer.clone(),
         http_client,
         config: CONFIG.clone(),
-        redis,
+        redis: redis.clone(),
     };
 
-    let auth_layer = AuthLayer::new(enforcer);
+    let auth_layer = AuthLayer::new(enforcer, redis);
 
     // 中间件链
     let cors = CorsLayer::very_permissive();

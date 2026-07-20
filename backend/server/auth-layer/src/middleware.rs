@@ -4,7 +4,7 @@ use axum::response::{IntoResponse, Response};
 use casbin::{CachedEnforcer, CoreApi};
 use futures::future::BoxFuture;
 use tower::Layer;
-use utils::prelude::{verify_token, DB};
+use utils::prelude::verify_token;
 use redis::AsyncCommands;
 
 use std::sync::Arc;
@@ -17,11 +17,15 @@ pub struct Username(pub String);
 #[derive(Clone)]
 pub struct AuthLayer {
     pub enforcer: Arc<RwLock<CachedEnforcer>>,
+    pub redis: redis::aio::ConnectionManager,
 }
 
 impl AuthLayer {
-    pub fn new(enforcer: Arc<RwLock<CachedEnforcer>>) -> Self {
-        Self { enforcer }
+    pub fn new(
+        enforcer: Arc<RwLock<CachedEnforcer>>,
+        redis: redis::aio::ConnectionManager,
+    ) -> Self {
+        Self { enforcer, redis }
     }
 }
 
@@ -32,6 +36,7 @@ impl<S> Layer<S> for AuthLayer {
         AuthMiddleware {
             inner,
             enforcer: self.enforcer.clone(),
+            redis: self.redis.clone(),
         }
     }
 }
@@ -40,6 +45,7 @@ impl<S> Layer<S> for AuthLayer {
 pub struct AuthMiddleware<S> {
     inner: S,
     enforcer: Arc<RwLock<CachedEnforcer>>,
+    redis: redis::aio::ConnectionManager,
 }
 
 impl<S> tower::Service<Request> for AuthMiddleware<S>
@@ -67,6 +73,7 @@ where
         let path = req.uri().path().to_string();
         let method = req.method().clone();
         let enforcer = self.enforcer.clone();
+        let redis = self.redis.clone();
 
         // 1. JWT 验证
         let token_info = if let Some(header) = auth_header {
@@ -100,7 +107,7 @@ where
 
         Box::pin(async move {
             // JWT 黑名单检查 — Redis O(1) 查询
-            let mut redis = DB::redis_connection().await.clone();
+            let mut redis = redis;
             let token_key = format!("jwt:blacklist:{}", token_str);
             let exists: bool = redis.exists(&token_key).await.unwrap_or(false);
             if exists {
