@@ -72,6 +72,7 @@ pub async fn setup_test_state() -> AppState {
 }
 
 /// 插入测试用户并返回 (id, username)
+#[allow(dead_code)]
 pub async fn insert_test_user(db: &DatabaseConnection) -> (i32, String) {
     use model::dao::sys_user;
     use sea_orm::Set;
