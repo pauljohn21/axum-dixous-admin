@@ -1,5 +1,6 @@
 pub mod casbin_service;
 pub mod enforcer;
+pub mod impls;
 pub mod jwt_blacklist_service;
 pub mod sys_api_service;
 pub mod sys_base_menu_btn_service;

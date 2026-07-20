@@ -10,6 +10,7 @@ sea-orm = { workspace = true }
 model = { workspace = true }
 utils = { workspace = true }
 serde = { workspace = true }
+async-trait = { workspace = true }
 serde_json = { workspace = true }
 casbin = { workspace = true }
 tokio = { workspace = true, features = ["sync"] }
