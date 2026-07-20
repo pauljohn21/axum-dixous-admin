@@ -15,11 +15,3 @@ mod rand_utils;
 mod res;
 mod state;
 mod traits;
-
-#[macro_export]
-macro_rules! db_conn {
-    () => {
-        utils::prelude::DB::db_connection().await
-    };
-}
-
