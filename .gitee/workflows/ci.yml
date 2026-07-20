@@ -8,6 +8,8 @@ on:
 
 env:
   CARGO_TERM_COLOR: always
+  # 国内镜像加速
+  CARGO_NET_GIT_FETCH_WITH_CLI: true
 
 jobs:
   # ===== 后端检查 =====
