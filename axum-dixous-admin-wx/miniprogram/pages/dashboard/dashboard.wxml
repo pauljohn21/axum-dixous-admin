@@ -1,47 +1,59 @@
 <!--pages/dashboard/dashboard.wxml-->
-<view class="dashboard">
-  <!-- 统计卡片 -->
-  <view class="stats-grid">
-    <view class="card stat-card">
-      <text class="stat-value">{{stats ? stats.user_count : '-'}}</text>
-      <text class="stat-label">用户总数</text>
+<view class="dashboard {{themeClass}}">
+  <!-- 骨架屏 -->
+  <block wx:if="{{loading}}">
+    <view class="stats-grid">
+      <view class="card skeleton-block skeleton-stat" wx:for="{{[1,2,3,4]}}" wx:key="*this"></view>
     </view>
-    <view class="card stat-card">
-      <text class="stat-value">{{stats ? stats.role_count : '-'}}</text>
-      <text class="stat-label">角色总数</text>
+    <view class="card">
+      <view class="skeleton-block skeleton-info-row" wx:for="{{[1,2,3,4,5]}}" wx:key="*this"></view>
     </view>
-    <view class="card stat-card">
-      <text class="stat-value">{{stats ? stats.menu_count : '-'}}</text>
-      <text class="stat-label">菜单总数</text>
-    </view>
-    <view class="card stat-card">
-      <text class="stat-value">{{stats ? stats.api_count : '-'}}</text>
-      <text class="stat-label">API 总数</text>
-    </view>
-  </view>
+  </block>
 
-  <!-- 系统信息 -->
-  <view class="card">
-    <view class="card-header">系统信息</view>
-    <view class="info-row">
-      <text class="info-label">后端框架</text>
-      <text class="info-value">{{systemInfo.backend}}</text>
+  <!-- 统计卡片 -->
+  <block wx:if="{{!loading}}">
+    <view class="stats-grid">
+      <view class="card stat-card">
+        <text class="stat-value">{{stats ? stats.user_count : '-'}}</text>
+        <text class="stat-label">用户总数</text>
+      </view>
+      <view class="card stat-card">
+        <text class="stat-value">{{stats ? stats.role_count : '-'}}</text>
+        <text class="stat-label">角色总数</text>
+      </view>
+      <view class="card stat-card">
+        <text class="stat-value">{{stats ? stats.menu_count : '-'}}</text>
+        <text class="stat-label">菜单总数</text>
+      </view>
+      <view class="card stat-card">
+        <text class="stat-value">{{stats ? stats.api_count : '-'}}</text>
+        <text class="stat-label">API 总数</text>
+      </view>
     </view>
-    <view class="info-row">
-      <text class="info-label">前端框架</text>
-      <text class="info-value">{{systemInfo.frontend}}</text>
+
+    <!-- 系统信息 -->
+    <view class="card">
+      <view class="card-header">系统信息</view>
+      <view class="info-row">
+        <text class="info-label">后端框架</text>
+        <text class="info-value">{{systemInfo.backend}}</text>
+      </view>
+      <view class="info-row">
+        <text class="info-label">前端框架</text>
+        <text class="info-value">{{systemInfo.frontend}}</text>
+      </view>
+      <view class="info-row">
+        <text class="info-label">ORM</text>
+        <text class="info-value">{{systemInfo.orm}}</text>
+      </view>
+      <view class="info-row">
+        <text class="info-label">数据库</text>
+        <text class="info-value">{{systemInfo.database}}</text>
+      </view>
+      <view class="info-row">
+        <text class="info-label">权限框架</text>
+        <text class="info-value">{{systemInfo.auth}}</text>
+      </view>
     </view>
-    <view class="info-row">
-      <text class="info-label">ORM</text>
-      <text class="info-value">{{systemInfo.orm}}</text>
-    </view>
-    <view class="info-row">
-      <text class="info-label">数据库</text>
-      <text class="info-value">{{systemInfo.database}}</text>
-    </view>
-    <view class="info-row">
-      <text class="info-label">权限框架</text>
-      <text class="info-value">{{systemInfo.auth}}</text>
-    </view>
-  </view>
+  </block>
 </view>

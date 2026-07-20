@@ -1,6 +1,7 @@
 import { api, LoginParams } from '../../utils/api'
 import { setToken } from '../../utils/auth'
 import { USERNAME_KEY } from '../../utils/config'
+import { applyTheme } from '../../utils/theme'
 
 Page({
   data: {
@@ -9,6 +10,12 @@ Page({
     loading: false,
     wxLoading: false,
     errorMsg: '',
+    themeClass: '',
+  },
+
+  onShow() {
+    const theme = applyTheme()
+    this.setData({ themeClass: theme === 'dark' ? 'dark' : '' })
   },
 
   onUsernameInput(e: WechatMiniprogram.Input) {

@@ -1,10 +1,12 @@
 import { api, DashboardStats } from '../../utils/api'
 import { isLoggedIn } from '../../utils/auth'
+import { applyTheme } from '../../utils/theme'
 
 Page({
   data: {
     stats: null as DashboardStats | null,
     loading: true,
+    themeClass: '',
     systemInfo: {
       backend: 'Axum 0.8',
       frontend: 'WeChat MiniProgram',
@@ -20,6 +22,11 @@ Page({
       return
     }
     this.loadStats()
+  },
+
+  onShow() {
+    const theme = applyTheme()
+    this.setData({ themeClass: theme === 'dark' ? 'dark' : '' })
   },
 
   onPullDownRefresh() {

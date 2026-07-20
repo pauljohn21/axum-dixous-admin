@@ -1,5 +1,5 @@
 <!--pages/login/login.wxml-->
-<view class="login-page">
+<view class="login-page {{themeClass}}">
   <!-- Logo 区域 -->
   <view class="logo-area">
     <text class="logo-title">Axum Admin</text>

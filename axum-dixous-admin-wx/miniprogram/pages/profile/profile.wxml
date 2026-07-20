@@ -1,5 +1,5 @@
 <!--pages/profile/profile.wxml-->
-<view class="profile-page">
+<view class="profile-page {{themeClass}}">
   <!-- 用户信息卡片 -->
   <view class="user-card">
     <view class="avatar-circle">
@@ -51,6 +51,28 @@
     </button>
   </view>
 
+  <!-- 系统管理入口 -->
+  <view class="card">
+    <view class="card-header">系统管理</view>
+    <view class="nav-item" bindtap="goToMenus" hover-class="list-item-hover">
+      <text class="info-value">菜单管理</text>
+      <text class="nav-arrow">›</text>
+    </view>
+    <view class="nav-item" bindtap="goToDicts" hover-class="list-item-hover">
+      <text class="info-value">字典管理</text>
+      <text class="nav-arrow">›</text>
+    </view>
+  </view>
+
+  <!-- 主题设置 -->
+  <view class="card">
+    <view class="card-header">外观设置</view>
+    <view class="theme-row">
+      <text class="info-label">暗色模式</text>
+      <switch checked="{{isDark}}" bindchange="onThemeToggle" color="#409eff" />
+    </view>
+  </view>
+
   <!-- 修改密码 -->
   <view class="card">
     <view class="card-header" bindtap="togglePasswordForm">
@@ -68,7 +90,7 @@
       />
       <input
         class="input-field"
-        placeholder="新密码"
+        placeholder="新密码 (至少6位)"
         password="{{true}}"
         value="{{newPassword}}"
         bindinput="onNewPasswordInput"

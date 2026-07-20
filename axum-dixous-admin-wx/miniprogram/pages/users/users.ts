@@ -1,5 +1,6 @@
 import { api, UserItem } from '../../utils/api'
 import { isLoggedIn } from '../../utils/auth'
+import { applyTheme } from '../../utils/theme'
 
 Page({
   data: {
@@ -10,6 +11,7 @@ Page({
     total: 0,
     loading: false,
     hasMore: true,
+    themeClass: '',
   },
 
   onLoad() {
@@ -18,6 +20,11 @@ Page({
       return
     }
     this.loadUsers(true)
+  },
+
+  onShow() {
+    const theme = applyTheme()
+    this.setData({ themeClass: theme === 'dark' ? 'dark' : '' })
   },
 
   onPullDownRefresh() {
@@ -36,6 +43,34 @@ Page({
 
   onSearch() {
     this.loadUsers(true)
+  },
+
+  /// 点击用户项 — 弹出操作菜单
+  onUserTap(e: WechatMiniprogram.TouchEventData) {
+    const id = e.currentTarget.dataset.id as number
+    const enable = e.currentTarget.dataset.enable as number
+    const actionText = enable ? '禁用' : '启用'
+
+    wx.showActionSheet({
+      itemList: [actionText],
+      success: (res) => {
+        if (res.tapIndex === 0) {
+          this.toggleUserEnable(id, enable)
+        }
+      },
+    })
+  },
+
+  /// 切换用户启用/禁用状态
+  async toggleUserEnable(id: number, currentEnable: number) {
+    const newEnable = currentEnable ? 0 : 1
+    try {
+      await api.updateUser(id, { enable: newEnable })
+      wx.showToast({ title: newEnable ? '已启用' : '已禁用', icon: 'success' })
+      this.loadUsers(true)
+    } catch (e: any) {
+      wx.showToast({ title: e.message || '操作失败', icon: 'none' })
+    }
   },
 
   async loadUsers(reset: boolean) {

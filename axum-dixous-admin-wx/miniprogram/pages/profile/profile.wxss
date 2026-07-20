@@ -4,6 +4,24 @@
   padding-bottom: 40rpx;
 }
 
+/* 暗色主题变量覆盖 */
+.profile-page.dark {
+  --bg-color: #1a1a2e;
+  --card-bg: #16213e;
+  --text-primary: #e0e0e0;
+  --text-secondary: #909090;
+  --border-color: #2a2a4a;
+  --border-light: #202040;
+  --primary-color: #409eff;
+  --input-bg: #0f3460;
+  --input-border: #2a2a4a;
+  --success-color: #67c23a;
+  --danger-color: #f56c6c;
+  --wechat-color: #07c160;
+  --shadow: rgba(0, 0, 0, 0.3);
+  --shadow-light: rgba(0, 0, 0, 0.2);
+}
+
 .user-card {
   display: flex;
   align-items: center;
@@ -44,10 +62,10 @@
 
 .card {
   margin: 24rpx 32rpx;
-  background: #ffffff;
+  background: var(--card-bg);
   border-radius: 16rpx;
   padding: 32rpx;
-  box-shadow: 0 2rpx 12rpx rgba(0, 0, 0, 0.04);
+  box-shadow: 0 2rpx 12rpx var(--shadow-light);
 }
 
 .card-header {
@@ -56,15 +74,15 @@
   align-items: center;
   font-size: 32rpx;
   font-weight: 600;
-  color: #303133;
+  color: var(--text-primary);
   margin-bottom: 24rpx;
   padding-bottom: 16rpx;
-  border-bottom: 1rpx solid #ebeef5;
+  border-bottom: 1rpx solid var(--border-color);
 }
 
 .arrow {
   font-size: 24rpx;
-  color: #909399;
+  color: var(--text-secondary);
 }
 
 .info-row {
@@ -72,7 +90,7 @@
   justify-content: space-between;
   align-items: center;
   padding: 20rpx 0;
-  border-bottom: 1rpx solid #f2f6fc;
+  border-bottom: 1rpx solid var(--border-light);
 }
 
 .info-row:last-child {
@@ -81,16 +99,16 @@
 
 .info-label {
   font-size: 28rpx;
-  color: #909399;
+  color: var(--text-secondary);
 }
 
 .info-value {
   font-size: 28rpx;
-  color: #303133;
+  color: var(--text-primary);
 }
 
 .text-success {
-  color: #67c23a !important;
+  color: var(--success-color) !important;
 }
 
 .text-warning {
@@ -104,16 +122,16 @@
 }
 
 .input-field {
-  border: 2rpx solid #dcdfe6;
+  border: 2rpx solid var(--input-border);
   border-radius: 8rpx;
   padding: 20rpx 24rpx;
   font-size: 28rpx;
-  color: #303133;
-  background: #fff;
+  color: var(--text-primary);
+  background: var(--card-bg);
 }
 
 .btn-primary {
-  background: #409eff !important;
+  background: var(--primary-color) !important;
   color: #ffffff !important;
   border: none !important;
   border-radius: 8rpx !important;
@@ -135,14 +153,51 @@
 }
 
 .btn-wx-rebind {
-  background: #909399 !important;
+  background: var(--text-secondary) !important;
 }
 
 .btn-logout {
-  background: #f56c6c !important;
+  background: var(--danger-color) !important;
   color: #ffffff !important;
   border: none !important;
   border-radius: 8rpx !important;
   font-size: 32rpx !important;
   width: 100% !important;
+}
+
+/* 主题切换 */
+.theme-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 20rpx 0;
+}
+
+.theme-switch {
+  display: flex;
+  align-items: center;
+  gap: 16rpx;
+}
+
+.theme-label {
+  font-size: 28rpx;
+  color: var(--text-secondary);
+}
+
+/* 导航入口 */
+.nav-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 24rpx 0;
+  border-bottom: 1rpx solid var(--border-light);
+}
+
+.nav-item:last-child {
+  border-bottom: none;
+}
+
+.nav-arrow {
+  font-size: 28rpx;
+  color: var(--text-placeholder);
 }

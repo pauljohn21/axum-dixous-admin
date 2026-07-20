@@ -1,15 +1,18 @@
 import { api, UserInfo } from '../../utils/api'
 import { isLoggedIn, clearToken } from '../../utils/auth'
+import { applyTheme, getTheme, toggleTheme } from '../../utils/theme'
 
 Page({
   data: {
-    userInfo: null,
+    userInfo: null as UserInfo | null,
     loading: true,
     showPasswordForm: false,
     oldPassword: '',
     newPassword: '',
     confirmPassword: '',
     wxBinding: false,
+    themeClass: '',
+    isDark: false,
   },
 
   onLoad() {
@@ -18,6 +21,14 @@ Page({
       return
     }
     this.loadUserInfo()
+  },
+
+  onShow() {
+    const theme = applyTheme()
+    this.setData({
+      themeClass: theme === 'dark' ? 'dark' : '',
+      isDark: theme === 'dark',
+    })
   },
 
   onPullDownRefresh() {
@@ -71,6 +82,11 @@ Page({
       return
     }
 
+    if (newPassword.length < 6) {
+      wx.showToast({ title: '密码至少 6 位', icon: 'none' })
+      return
+    }
+
     try {
       await api.changePassword(oldPassword, newPassword)
       wx.showToast({ title: '密码修改成功', icon: 'success' })
@@ -80,9 +96,18 @@ Page({
     }
   },
 
+  /// 切换暗色/亮色主题
+  onThemeToggle() {
+    const theme = toggleTheme()
+    applyTheme(theme)
+    this.setData({
+      themeClass: theme === 'dark' ? 'dark' : '',
+      isDark: theme === 'dark',
+    })
+  },
+
   /// 绑定微信号
   async bindWechat() {
-    // 已绑定则提示
     if (this.data.userInfo && this.data.userInfo.wx_openid) {
       wx.showModal({
         title: '提示',
@@ -110,13 +135,22 @@ Page({
 
       await api.wxBind(code)
       wx.showToast({ title: '绑定成功', icon: 'success' })
-      // 重新加载用户信息以更新绑定状态
       await this.loadUserInfo()
     } catch (e: any) {
       wx.showToast({ title: e.message || '绑定失败', icon: 'none' })
     } finally {
       this.setData({ wxBinding: false })
     }
+  },
+
+  /// 跳转菜单管理
+  goToMenus() {
+    wx.navigateTo({ url: '/pages/menus/menus' })
+  },
+
+  /// 跳转字典管理
+  goToDicts() {
+    wx.navigateTo({ url: '/pages/dicts/dicts' })
   },
 
   async doLogout() {
