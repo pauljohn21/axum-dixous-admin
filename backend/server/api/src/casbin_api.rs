@@ -1,4 +1,4 @@
-use axum::extract::{Path, Query};
+use axum::extract::{Path, Query, State};
 use axum::response::IntoResponse;
 use axum::routing::{get, post, put};
 use axum::routing::delete as delete_method;
@@ -9,7 +9,7 @@ use utoipa::ToSchema;
 use model::dao::casbin_rule;
 use model::dto::page_dto::{PageRequest, PageResponse};
 use service::casbin_service::{CasbinService, CreateCasbinRuleRequest, UpdateCasbinRuleRequest};
-use utils::prelude::{AppError, R};
+use utils::prelude::{AppError, R, AppState};
 
 #[utoipa::path(
     get,
@@ -18,8 +18,8 @@ use utils::prelude::{AppError, R};
     responses((status = 200, description = "成功", body = R<PageResponse<casbin_rule::Model>>)),
     tag = "Casbin策略"
 )]
-pub async fn list(Query(query): Query<PageRequest>) -> Result<impl IntoResponse, AppError> {
-    let result = CasbinService::list(query).await.map_err(AppError::Anyhow)?;
+pub async fn list(State(state): State<AppState>, Query(query): Query<PageRequest>) -> Result<impl IntoResponse, AppError> {
+    let result = CasbinService::list(&state.db, query).await?;
     Ok(R::ok(result))
 }
 
@@ -30,8 +30,8 @@ pub async fn list(Query(query): Query<PageRequest>) -> Result<impl IntoResponse,
     responses((status = 200, description = "成功", body = R<casbin_rule::Model>)),
     tag = "Casbin策略"
 )]
-pub async fn get_by_id(Path(id): Path<u64>) -> Result<impl IntoResponse, AppError> {
-    let rule = CasbinService::get_by_id(id).await.map_err(|e| AppError::NotFoundError(e.to_string()))?;
+pub async fn get_by_id(State(state): State<AppState>, Path(id): Path<u64>) -> Result<impl IntoResponse, AppError> {
+    let rule = CasbinService::get_by_id(&state.db, id).await?;
     Ok(R::ok(rule))
 }
 
@@ -42,8 +42,8 @@ pub async fn get_by_id(Path(id): Path<u64>) -> Result<impl IntoResponse, AppErro
     responses((status = 200, description = "创建成功", body = R<casbin_rule::Model>)),
     tag = "Casbin策略"
 )]
-pub async fn create(Json(request): Json<CreateCasbinRuleRequest>) -> Result<impl IntoResponse, AppError> {
-    let rule = CasbinService::create(request).await.map_err(AppError::Anyhow)?;
+pub async fn create(State(state): State<AppState>, Json(request): Json<CreateCasbinRuleRequest>) -> Result<impl IntoResponse, AppError> {
+    let rule = CasbinService::create(&state.db, request).await?;
     Ok(R::ok(rule))
 }
 
@@ -54,8 +54,8 @@ pub async fn create(Json(request): Json<CreateCasbinRuleRequest>) -> Result<impl
     responses((status = 200, description = "更新成功", body = R<casbin_rule::Model>)),
     tag = "Casbin策略"
 )]
-pub async fn update(Path(id): Path<u64>, Json(request): Json<UpdateCasbinRuleRequest>) -> Result<impl IntoResponse, AppError> {
-    let rule = CasbinService::update(id, request).await.map_err(AppError::Anyhow)?;
+pub async fn update(State(state): State<AppState>, Path(id): Path<u64>, Json(request): Json<UpdateCasbinRuleRequest>) -> Result<impl IntoResponse, AppError> {
+    let rule = CasbinService::update(&state.db, id, request).await?;
     Ok(R::ok(rule))
 }
 
@@ -66,8 +66,8 @@ pub async fn update(Path(id): Path<u64>, Json(request): Json<UpdateCasbinRuleReq
     responses((status = 200, description = "删除成功", body = R<serde_json::Value>)),
     tag = "Casbin策略"
 )]
-pub async fn delete(Path(id): Path<u64>) -> Result<impl IntoResponse, AppError> {
-    CasbinService::delete(id).await.map_err(AppError::Anyhow)?;
+pub async fn delete(State(state): State<AppState>, Path(id): Path<u64>) -> Result<impl IntoResponse, AppError> {
+    CasbinService::delete(&state.db, id).await?;
     Ok(R::ok(()))
 }
 
@@ -83,8 +83,8 @@ pub struct BatchDeleteRequest {
     responses((status = 200, description = "批量删除成功", body = R<u64>)),
     tag = "Casbin策略"
 )]
-pub async fn delete_batch(Json(request): Json<BatchDeleteRequest>) -> Result<impl IntoResponse, AppError> {
-    let deleted_count = CasbinService::delete_batch(request.ids).await.map_err(AppError::Anyhow)?;
+pub async fn delete_batch(State(state): State<AppState>, Json(request): Json<BatchDeleteRequest>) -> Result<impl IntoResponse, AppError> {
+    let deleted_count = CasbinService::delete_batch(&state.db, request.ids).await?;
     Ok(R::ok(deleted_count))
 }
 
@@ -107,15 +107,14 @@ pub struct UpdateRolePoliciesRequest {
     responses((status = 200, description = "权限策略更新成功", body = R<serde_json::Value>)),
     tag = "Casbin策略"
 )]
-pub async fn update_role_policies(Path(role): Path<String>, Json(req): Json<UpdateRolePoliciesRequest>) -> Result<impl IntoResponse, AppError> {
+pub async fn update_role_policies(State(state): State<AppState>, Path(role): Path<String>, Json(req): Json<UpdateRolePoliciesRequest>) -> Result<impl IntoResponse, AppError> {
     let policies: Vec<(String, String)> = req.casbin_infos
         .into_iter()
         .map(|info| (info.path, info.method))
         .collect();
 
-    CasbinService::update_role_policies(&role, policies)
-        .await
-        .map_err(AppError::Anyhow)?;
+    CasbinService::update_role_policies(&state.db, &role, policies)
+        .await?;
 
     Ok(R::ok(()))
 }
@@ -127,8 +126,8 @@ pub async fn update_role_policies(Path(role): Path<String>, Json(req): Json<Upda
     responses((status = 200, description = "成功", body = R<Vec<casbin_rule::Model>>)),
     tag = "Casbin策略"
 )]
-pub async fn get_policies_by_role(Path(role): Path<String>) -> Result<impl IntoResponse, AppError> {
-    let policies = CasbinService::get_policy_by_role(&role).await.map_err(AppError::Anyhow)?;
+pub async fn get_policies_by_role(State(state): State<AppState>, Path(role): Path<String>) -> Result<impl IntoResponse, AppError> {
+    let policies = CasbinService::get_policy_by_role(&state.db, &role).await?;
     Ok(R::ok(policies))
 }
 
@@ -139,12 +138,12 @@ pub async fn get_policies_by_role(Path(role): Path<String>) -> Result<impl IntoR
     responses((status = 200, description = "成功", body = R<Vec<casbin_rule::Model>>)),
     tag = "Casbin策略"
 )]
-pub async fn get_roles_for_user(Path(user): Path<String>) -> Result<impl IntoResponse, AppError> {
-    let roles = CasbinService::get_roles_for_user(&user).await.map_err(AppError::Anyhow)?;
+pub async fn get_roles_for_user(State(state): State<AppState>, Path(user): Path<String>) -> Result<impl IntoResponse, AppError> {
+    let roles = CasbinService::get_roles_for_user(&state.db, &user).await?;
     Ok(R::ok(roles))
 }
 
-pub fn routes() -> Router {
+pub fn routes() -> Router<AppState> {
     Router::new()
         .route("/api/casbin/list", get(list))
         .route("/api/casbin/{id}", get(get_by_id))

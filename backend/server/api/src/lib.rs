@@ -22,7 +22,7 @@ use utoipa::OpenApi;
 
 use model::dao::*;
 use model::dto::*;
-use utils::prelude::R;
+use utils::prelude::{R, AppState};
 
 #[derive(OpenApi)]
 #[openapi(
@@ -119,14 +119,14 @@ impl Modify for SecurityAddon {
     }
 }
 
-pub fn public_routes() -> Router {
+pub fn public_routes() -> Router<AppState> {
     Router::new()
         .route("/api/user/login", post(user_api::login))
         .route("/api/user/wx-login", post(user_api::wx_login))
         .route("/health", axum::routing::get(health))
 }
 
-pub fn protected_routes() -> Router {
+pub fn protected_routes() -> Router<AppState> {
     Router::new()
         .merge(user_api::routes())
         .merge(role_api::routes())

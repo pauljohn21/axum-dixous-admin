@@ -1,4 +1,4 @@
-use axum::extract::{Extension, Path, Query};
+use axum::extract::{Extension, Path, Query, State};
 use axum::response::IntoResponse;
 use axum::Json;
 use axum::routing::{get, post};
@@ -8,7 +8,7 @@ use model::dao::sys_menu;
 use model::dto::page_dto::{PageRequest, PageResponse};
 use model::dto::sys_menu_dto::{SysMenuInsertDTO, SysMenuUpdateDTO};
 use service::sys_menu_service::SysMenuService;
-use utils::prelude::{AppError, R};
+use utils::prelude::{AppError, R, AppState};
 
 #[utoipa::path(
     post,
@@ -17,8 +17,8 @@ use utils::prelude::{AppError, R};
     responses((status = 200, description = "成功", body = R<sys_menu::Model>)),
     tag = "菜单管理"
 )]
-pub async fn create(Json(data): Json<SysMenuInsertDTO>) -> Result<impl IntoResponse, AppError> {
-    let menu = SysMenuService::insert(data).await.map_err(AppError::Anyhow)?;
+pub async fn create(State(state): State<AppState>, Json(data): Json<SysMenuInsertDTO>) -> Result<impl IntoResponse, AppError> {
+    let menu = SysMenuService::insert(&state.db, data).await?;
     Ok(R::ok(menu))
 }
 
@@ -29,8 +29,8 @@ pub async fn create(Json(data): Json<SysMenuInsertDTO>) -> Result<impl IntoRespo
     responses((status = 200, description = "成功", body = R<PageResponse<sys_menu::Model>>)),
     tag = "菜单管理"
 )]
-pub async fn list(Query(query): Query<PageRequest>) -> Result<impl IntoResponse, AppError> {
-    let result = SysMenuService::list(query).await.map_err(AppError::Anyhow)?;
+pub async fn list(State(state): State<AppState>, Query(query): Query<PageRequest>) -> Result<impl IntoResponse, AppError> {
+    let result = SysMenuService::list(&state.db, query).await?;
     Ok(R::ok(result))
 }
 
@@ -41,8 +41,8 @@ pub async fn list(Query(query): Query<PageRequest>) -> Result<impl IntoResponse,
     responses((status = 200, description = "成功", body = R<sys_menu::Model>)),
     tag = "菜单管理"
 )]
-pub async fn get_by_id(Path(id): Path<i32>) -> Result<impl IntoResponse, AppError> {
-    let menu = SysMenuService::get_by_id(id).await.map_err(|e| AppError::NotFoundError(e.to_string()))?;
+pub async fn get_by_id(State(state): State<AppState>, Path(id): Path<i32>) -> Result<impl IntoResponse, AppError> {
+    let menu = SysMenuService::get_by_id(&state.db, id).await?;
     Ok(R::ok(menu))
 }
 
@@ -54,8 +54,8 @@ pub async fn get_by_id(Path(id): Path<i32>) -> Result<impl IntoResponse, AppErro
     responses((status = 200, description = "成功", body = R<sys_menu::Model>)),
     tag = "菜单管理"
 )]
-pub async fn update(Path(id): Path<i32>, Json(data): Json<SysMenuUpdateDTO>) -> Result<impl IntoResponse, AppError> {
-    let menu = SysMenuService::update(id, data).await.map_err(AppError::Anyhow)?;
+pub async fn update(State(state): State<AppState>, Path(id): Path<i32>, Json(data): Json<SysMenuUpdateDTO>) -> Result<impl IntoResponse, AppError> {
+    let menu = SysMenuService::update(&state.db, id, data).await?;
     Ok(R::ok(menu))
 }
 
@@ -66,8 +66,8 @@ pub async fn update(Path(id): Path<i32>, Json(data): Json<SysMenuUpdateDTO>) -> 
     responses((status = 200, description = "成功", body = R<serde_json::Value>)),
     tag = "菜单管理"
 )]
-pub async fn delete_menu(Path(id): Path<i32>) -> Result<impl IntoResponse, AppError> {
-    SysMenuService::delete(id).await.map_err(AppError::Anyhow)?;
+pub async fn delete_menu(State(state): State<AppState>, Path(id): Path<i32>) -> Result<impl IntoResponse, AppError> {
+    SysMenuService::delete(&state.db, id).await?;
     Ok(R::ok(()))
 }
 
@@ -77,14 +77,13 @@ pub async fn delete_menu(Path(id): Path<i32>) -> Result<impl IntoResponse, AppEr
     responses((status = 200, description = "成功", body = R<Vec<sys_menu::Model>>)),
     tag = "菜单管理"
 )]
-pub async fn get_user_menus(Extension(username): Extension<Username>) -> Result<impl IntoResponse, AppError> {
-    let menus = SysMenuService::get_menus_by_username(&username.0)
-        .await
-        .map_err(AppError::Anyhow)?;
+pub async fn get_user_menus(State(state): State<AppState>, Extension(username): Extension<Username>) -> Result<impl IntoResponse, AppError> {
+    let menus = SysMenuService::get_menus_by_username(&state.db, &username.0)
+        .await?;
     Ok(R::ok(menus))
 }
 
-pub fn routes() -> Router {
+pub fn routes() -> Router<AppState> {
     Router::new()
         .route("/api/menu", post(create))
         .route("/api/menu/list", get(list))

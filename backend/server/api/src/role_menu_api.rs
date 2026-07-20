@@ -1,4 +1,4 @@
-use axum::extract::{Path, Query};
+use axum::extract::{Path, Query, State};
 use axum::response::IntoResponse;
 use axum::Json;
 use axum::routing::{get, post};
@@ -8,7 +8,7 @@ use model::dto::page_dto::PageRequest;
 use model::dto::page_dto::PageResponse;
 use model::dto::sys_role_menu_dto::SysRoleMenuInsertDTO;
 use service::sys_role_menu_service::SysRoleMenuService;
-use utils::prelude::{AppError, R};
+use utils::prelude::{AppError, R, AppState};
 use serde::Deserialize;
 use utoipa::IntoParams;
 
@@ -25,8 +25,8 @@ pub struct CompositeIdPath {
     responses((status = 200, description = "成功", body = R<sys_role_menus::Model>)),
     tag = "角色菜单"
 )]
-pub async fn create(Json(data): Json<SysRoleMenuInsertDTO>) -> Result<impl IntoResponse, AppError> {
-    let record = SysRoleMenuService::insert(data).await.map_err(AppError::Anyhow)?;
+pub async fn create(State(state): State<AppState>, Json(data): Json<SysRoleMenuInsertDTO>) -> Result<impl IntoResponse, AppError> {
+    let record = SysRoleMenuService::insert(&state.db, data).await?;
     Ok(R::ok(record))
 }
 
@@ -37,8 +37,8 @@ pub async fn create(Json(data): Json<SysRoleMenuInsertDTO>) -> Result<impl IntoR
     responses((status = 200, description = "成功", body = R<PageResponse<sys_role_menus::Model>>)),
     tag = "角色菜单"
 )]
-pub async fn list(Query(query): Query<PageRequest>) -> Result<impl IntoResponse, AppError> {
-    let result = SysRoleMenuService::list(query).await.map_err(AppError::Anyhow)?;
+pub async fn list(State(state): State<AppState>, Query(query): Query<PageRequest>) -> Result<impl IntoResponse, AppError> {
+    let result = SysRoleMenuService::list(&state.db, query).await?;
     Ok(R::ok(result))
 }
 
@@ -52,10 +52,10 @@ pub async fn list(Query(query): Query<PageRequest>) -> Result<impl IntoResponse,
     responses((status = 200, description = "成功", body = R<sys_role_menus::Model>)),
     tag = "角色菜单"
 )]
-pub async fn get_by_composite_id(Path(path): Path<CompositeIdPath>) -> Result<impl IntoResponse, AppError> {
-    let record = SysRoleMenuService::get_by_composite_id(path.sys_base_menu_id, path.sys_role_role_id)
+pub async fn get_by_composite_id(State(state): State<AppState>, Path(path): Path<CompositeIdPath>) -> Result<impl IntoResponse, AppError> {
+    let record = SysRoleMenuService::get_by_composite_id(&state.db, path.sys_base_menu_id, path.sys_role_role_id)
         .await
-        .map_err(|e| AppError::NotFoundError(e.to_string()))?;
+        ?;
     Ok(R::ok(record))
 }
 
@@ -69,14 +69,14 @@ pub async fn get_by_composite_id(Path(path): Path<CompositeIdPath>) -> Result<im
     responses((status = 200, description = "成功", body = R<serde_json::Value>)),
     tag = "角色菜单"
 )]
-pub async fn delete_role_menu(Path(path): Path<CompositeIdPath>) -> Result<impl IntoResponse, AppError> {
-    SysRoleMenuService::delete(path.sys_base_menu_id, path.sys_role_role_id)
+pub async fn delete_role_menu(State(state): State<AppState>, Path(path): Path<CompositeIdPath>) -> Result<impl IntoResponse, AppError> {
+    SysRoleMenuService::delete(&state.db, path.sys_base_menu_id, path.sys_role_role_id)
         .await
-        .map_err(AppError::Anyhow)?;
+        ?;
     Ok(R::ok(()))
 }
 
-pub fn routes() -> Router {
+pub fn routes() -> Router<AppState> {
     Router::new()
         .route("/api/roleMenu", post(create))
         .route("/api/roleMenu/list", get(list))

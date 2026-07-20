@@ -1,4 +1,4 @@
-use axum::extract::{Path, Query};
+use axum::extract::{Path, Query, State};
 use axum::response::IntoResponse;
 use axum::Json;
 use axum::routing::{get, post};
@@ -8,7 +8,7 @@ use model::dto::page_dto::PageRequest;
 use model::dto::page_dto::PageResponse;
 use model::dto::sys_role_btn_dto::SysRoleBtnInsertDTO;
 use service::sys_role_btn_service::SysRoleBtnService;
-use utils::prelude::{AppError, R};
+use utils::prelude::{AppError, R, AppState};
 use serde::Deserialize;
 use utoipa::IntoParams;
 
@@ -26,8 +26,8 @@ pub struct CompositeIdPath {
     responses((status = 200, description = "成功", body = R<sys_role_btns::Model>)),
     tag = "角色按钮"
 )]
-pub async fn create(Json(data): Json<SysRoleBtnInsertDTO>) -> Result<impl IntoResponse, AppError> {
-    let record = SysRoleBtnService::insert(data).await.map_err(AppError::Anyhow)?;
+pub async fn create(State(state): State<AppState>, Json(data): Json<SysRoleBtnInsertDTO>) -> Result<impl IntoResponse, AppError> {
+    let record = SysRoleBtnService::insert(&state.db, data).await?;
     Ok(R::ok(record))
 }
 
@@ -38,8 +38,8 @@ pub async fn create(Json(data): Json<SysRoleBtnInsertDTO>) -> Result<impl IntoRe
     responses((status = 200, description = "成功", body = R<PageResponse<sys_role_btns::Model>>)),
     tag = "角色按钮"
 )]
-pub async fn list(Query(query): Query<PageRequest>) -> Result<impl IntoResponse, AppError> {
-    let result = SysRoleBtnService::list(query).await.map_err(AppError::Anyhow)?;
+pub async fn list(State(state): State<AppState>, Query(query): Query<PageRequest>) -> Result<impl IntoResponse, AppError> {
+    let result = SysRoleBtnService::list(&state.db, query).await?;
     Ok(R::ok(result))
 }
 
@@ -54,10 +54,10 @@ pub async fn list(Query(query): Query<PageRequest>) -> Result<impl IntoResponse,
     responses((status = 200, description = "成功", body = R<sys_role_btns::Model>)),
     tag = "角色按钮"
 )]
-pub async fn get_by_composite_id(Path(path): Path<CompositeIdPath>) -> Result<impl IntoResponse, AppError> {
-    let record = SysRoleBtnService::get_by_composite_id(path.role_id, path.sys_menu_id, path.sys_base_menu_btn_id)
+pub async fn get_by_composite_id(State(state): State<AppState>, Path(path): Path<CompositeIdPath>) -> Result<impl IntoResponse, AppError> {
+    let record = SysRoleBtnService::get_by_composite_id(&state.db, path.role_id, path.sys_menu_id, path.sys_base_menu_btn_id)
         .await
-        .map_err(|e| AppError::NotFoundError(e.to_string()))?;
+        ?;
     Ok(R::ok(record))
 }
 
@@ -72,14 +72,14 @@ pub async fn get_by_composite_id(Path(path): Path<CompositeIdPath>) -> Result<im
     responses((status = 200, description = "成功", body = R<serde_json::Value>)),
     tag = "角色按钮"
 )]
-pub async fn delete_role_btn(Path(path): Path<CompositeIdPath>) -> Result<impl IntoResponse, AppError> {
-    SysRoleBtnService::delete(path.role_id, path.sys_menu_id, path.sys_base_menu_btn_id)
+pub async fn delete_role_btn(State(state): State<AppState>, Path(path): Path<CompositeIdPath>) -> Result<impl IntoResponse, AppError> {
+    SysRoleBtnService::delete(&state.db, path.role_id, path.sys_menu_id, path.sys_base_menu_btn_id)
         .await
-        .map_err(AppError::Anyhow)?;
+        ?;
     Ok(R::ok(()))
 }
 
-pub fn routes() -> Router {
+pub fn routes() -> Router<AppState> {
     Router::new()
         .route("/api/roleBtn", post(create))
         .route("/api/roleBtn/list", get(list))

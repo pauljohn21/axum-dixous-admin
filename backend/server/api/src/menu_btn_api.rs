@@ -1,4 +1,4 @@
-use axum::extract::{Path, Query};
+use axum::extract::{Path, Query, State};
 use axum::response::IntoResponse;
 use axum::Json;
 use axum::routing::{get, post};
@@ -7,7 +7,7 @@ use model::dao::sys_base_menu_btns;
 use model::dto::page_dto::{PageRequest, PageResponse};
 use model::dto::sys_base_menu_btn_dto::{SysBaseMenuBtnInsertDTO, SysBaseMenuBtnUpdateDTO};
 use service::sys_base_menu_btn_service::SysBaseMenuBtnService;
-use utils::prelude::{AppError, R};
+use utils::prelude::{AppError, R, AppState};
 
 #[utoipa::path(
     post,
@@ -16,8 +16,8 @@ use utils::prelude::{AppError, R};
     responses((status = 200, description = "成功", body = R<sys_base_menu_btns::Model>)),
     tag = "菜单按钮"
 )]
-pub async fn create(Json(data): Json<SysBaseMenuBtnInsertDTO>) -> Result<impl IntoResponse, AppError> {
-    let btn = SysBaseMenuBtnService::insert(data).await.map_err(AppError::Anyhow)?;
+pub async fn create(State(state): State<AppState>, Json(data): Json<SysBaseMenuBtnInsertDTO>) -> Result<impl IntoResponse, AppError> {
+    let btn = SysBaseMenuBtnService::insert(&state.db, data).await?;
     Ok(R::ok(btn))
 }
 
@@ -28,8 +28,8 @@ pub async fn create(Json(data): Json<SysBaseMenuBtnInsertDTO>) -> Result<impl In
     responses((status = 200, description = "成功", body = R<PageResponse<sys_base_menu_btns::Model>>)),
     tag = "菜单按钮"
 )]
-pub async fn list(Query(query): Query<PageRequest>) -> Result<impl IntoResponse, AppError> {
-    let result = SysBaseMenuBtnService::list(query).await.map_err(AppError::Anyhow)?;
+pub async fn list(State(state): State<AppState>, Query(query): Query<PageRequest>) -> Result<impl IntoResponse, AppError> {
+    let result = SysBaseMenuBtnService::list(&state.db, query).await?;
     Ok(R::ok(result))
 }
 
@@ -40,8 +40,8 @@ pub async fn list(Query(query): Query<PageRequest>) -> Result<impl IntoResponse,
     responses((status = 200, description = "成功", body = R<sys_base_menu_btns::Model>)),
     tag = "菜单按钮"
 )]
-pub async fn get_by_id(Path(id): Path<u64>) -> Result<impl IntoResponse, AppError> {
-    let btn = SysBaseMenuBtnService::get_by_id(id).await.map_err(|e| AppError::NotFoundError(e.to_string()))?;
+pub async fn get_by_id(State(state): State<AppState>, Path(id): Path<u64>) -> Result<impl IntoResponse, AppError> {
+    let btn = SysBaseMenuBtnService::get_by_id(&state.db, id).await?;
     Ok(R::ok(btn))
 }
 
@@ -53,8 +53,8 @@ pub async fn get_by_id(Path(id): Path<u64>) -> Result<impl IntoResponse, AppErro
     responses((status = 200, description = "成功", body = R<sys_base_menu_btns::Model>)),
     tag = "菜单按钮"
 )]
-pub async fn update(Path(id): Path<u64>, Json(data): Json<SysBaseMenuBtnUpdateDTO>) -> Result<impl IntoResponse, AppError> {
-    let btn = SysBaseMenuBtnService::update(id, data).await.map_err(AppError::Anyhow)?;
+pub async fn update(State(state): State<AppState>, Path(id): Path<u64>, Json(data): Json<SysBaseMenuBtnUpdateDTO>) -> Result<impl IntoResponse, AppError> {
+    let btn = SysBaseMenuBtnService::update(&state.db, id, data).await?;
     Ok(R::ok(btn))
 }
 
@@ -65,12 +65,12 @@ pub async fn update(Path(id): Path<u64>, Json(data): Json<SysBaseMenuBtnUpdateDT
     responses((status = 200, description = "成功", body = R<serde_json::Value>)),
     tag = "菜单按钮"
 )]
-pub async fn delete_btn(Path(id): Path<u64>) -> Result<impl IntoResponse, AppError> {
-    SysBaseMenuBtnService::delete(id).await.map_err(AppError::Anyhow)?;
+pub async fn delete_btn(State(state): State<AppState>, Path(id): Path<u64>) -> Result<impl IntoResponse, AppError> {
+    SysBaseMenuBtnService::delete(&state.db, id).await?;
     Ok(R::ok(()))
 }
 
-pub fn routes() -> Router {
+pub fn routes() -> Router<AppState> {
     Router::new()
         .route("/api/menuBtn", post(create))
         .route("/api/menuBtn/list", get(list))

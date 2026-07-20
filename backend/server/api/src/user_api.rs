@@ -1,4 +1,4 @@
-use axum::extract::{Extension, Path, Query, Request};
+use axum::extract::{Extension, Path, Query, Request, State};
 use axum::http::header::AUTHORIZATION;
 use axum::response::IntoResponse;
 use axum::Json;
@@ -14,7 +14,7 @@ use utoipa::ToSchema;
 use service::jwt_blacklist_service::JwtBlacklistService;
 use service::sys_menu_service::SysMenuService;
 use service::sys_user_service::SysUserService;
-use utils::prelude::{AppError, R, create_token};
+use utils::prelude::{AppError, AppState, R, create_token};
 
 #[derive(Serialize, ToSchema)]
 pub struct LoginResp { pub token: String }
@@ -56,9 +56,10 @@ pub struct WxBindDTO {
     responses((status = 200, description = "成功", body = R<LoginResp>)),
     tag = "用户管理"
 )]
-pub async fn login(Json(data): Json<LoginDTO>) -> Result<impl IntoResponse, AppError> {
-    let user = SysUserService::login(data).await.map_err(|e| AppError::AuthError(e.to_string()))?;
-    let token = create_token(&user.username.clone().unwrap_or_default()).map_err(|e| AppError::AuthError(e.to_string()))?;
+pub async fn login(State(state): State<AppState>, Json(data): Json<LoginDTO>) -> Result<impl IntoResponse, AppError> {
+    let user = SysUserService::login(&state.db, data).await?;
+    let token = create_token(&user.username.clone().unwrap_or_default())
+        .map_err(|e| AppError::AuthError(e.to_string()))?;
     Ok(R::ok(LoginResp { token }))
 }
 
@@ -70,10 +71,8 @@ pub async fn login(Json(data): Json<LoginDTO>) -> Result<impl IntoResponse, AppE
     responses((status = 200, description = "成功", body = R<LoginResp>)),
     tag = "用户管理"
 )]
-pub async fn wx_login(Json(data): Json<WxLoginDTO>) -> Result<impl IntoResponse, AppError> {
-    let user = SysUserService::wx_login(&data.code)
-        .await
-        .map_err(|e| AppError::AuthError(e.to_string()))?;
+pub async fn wx_login(State(state): State<AppState>, Json(data): Json<WxLoginDTO>) -> Result<impl IntoResponse, AppError> {
+    let user = SysUserService::wx_login(&state.db, &data.code).await?;
     let token = create_token(&user.username.clone().unwrap_or_default())
         .map_err(|e| AppError::AuthError(e.to_string()))?;
     Ok(R::ok(LoginResp { token }))
@@ -86,8 +85,8 @@ pub async fn wx_login(Json(data): Json<WxLoginDTO>) -> Result<impl IntoResponse,
     responses((status = 200, description = "成功", body = R<serde_json::Value>)),
     tag = "用户管理"
 )]
-pub async fn register(Json(data): Json<SysUserInsertDTO>) -> Result<impl IntoResponse, AppError> {
-    SysUserService::insert(data).await.map_err(|e| AppError::AuthError(e.to_string()))?;
+pub async fn register(State(state): State<AppState>, Json(data): Json<SysUserInsertDTO>) -> Result<impl IntoResponse, AppError> {
+    SysUserService::insert(&state.db, data).await?;
     Ok(R::ok(()))
 }
 
@@ -98,14 +97,14 @@ pub async fn register(Json(data): Json<SysUserInsertDTO>) -> Result<impl IntoRes
     responses((status = 200, description = "成功", body = R<serde_json::Value>)),
     tag = "用户管理"
 )]
-pub async fn logout(req: Request) -> Result<impl IntoResponse, AppError> {
+pub async fn logout(State(state): State<AppState>, req: Request) -> Result<impl IntoResponse, AppError> {
     if let Some(auth_header) = req.headers().get(AUTHORIZATION).and_then(|v| v.to_str().ok()) {
         if let Some(token) = auth_header.strip_prefix("Bearer ") {
             // 将 token 加入 JWT 黑名单
             let dto = model::dto::jwt_blacklist_dto::JwtBlacklistInsertDTO {
                 jwt: Some(token.to_string()),
             };
-            let _ = JwtBlacklistService::insert(dto).await;
+            let _ = JwtBlacklistService::insert(&state.db, dto).await;
         }
     }
     Ok(R::ok(()))
@@ -118,8 +117,8 @@ pub async fn logout(req: Request) -> Result<impl IntoResponse, AppError> {
     responses((status = 200, description = "成功", body = R<PageResponse<sys_user::Model>>)),
     tag = "用户管理"
 )]
-pub async fn list(Query(query): Query<PageRequest>) -> Result<impl IntoResponse, AppError> {
-    let result = SysUserService::list(query).await.map_err(AppError::Anyhow)?;
+pub async fn list(State(state): State<AppState>, Query(query): Query<PageRequest>) -> Result<impl IntoResponse, AppError> {
+    let result = SysUserService::list(&state.db, query).await?;
     Ok(R::ok(result))
 }
 
@@ -130,8 +129,8 @@ pub async fn list(Query(query): Query<PageRequest>) -> Result<impl IntoResponse,
     responses((status = 200, description = "成功", body = R<sys_user::Model>)),
     tag = "用户管理"
 )]
-pub async fn get_by_id(Path(id): Path<i32>) -> Result<impl IntoResponse, AppError> {
-    let user = SysUserService::get_by_id(id).await.map_err(|e| AppError::NotFoundError(e.to_string()))?;
+pub async fn get_by_id(State(state): State<AppState>, Path(id): Path<i32>) -> Result<impl IntoResponse, AppError> {
+    let user = SysUserService::get_by_id(&state.db, id).await?;
     Ok(R::ok(user))
 }
 
@@ -143,8 +142,8 @@ pub async fn get_by_id(Path(id): Path<i32>) -> Result<impl IntoResponse, AppErro
     responses((status = 200, description = "成功", body = R<sys_user::Model>)),
     tag = "用户管理"
 )]
-pub async fn update(Path(id): Path<i32>, Json(data): Json<SysUserUpdateDTO>) -> Result<impl IntoResponse, AppError> {
-    let user = SysUserService::update(id, data).await.map_err(AppError::Anyhow)?;
+pub async fn update(State(state): State<AppState>, Path(id): Path<i32>, Json(data): Json<SysUserUpdateDTO>) -> Result<impl IntoResponse, AppError> {
+    let user = SysUserService::update(&state.db, id, data).await?;
     Ok(R::ok(user))
 }
 
@@ -155,8 +154,8 @@ pub async fn update(Path(id): Path<i32>, Json(data): Json<SysUserUpdateDTO>) -> 
     responses((status = 200, description = "成功", body = R<serde_json::Value>)),
     tag = "用户管理"
 )]
-pub async fn delete_user(Path(id): Path<i32>) -> Result<impl IntoResponse, AppError> {
-    SysUserService::delete(id).await.map_err(AppError::Anyhow)?;
+pub async fn delete_user(State(state): State<AppState>, Path(id): Path<i32>) -> Result<impl IntoResponse, AppError> {
+    SysUserService::delete(&state.db, id).await?;
     Ok(R::ok(()))
 }
 
@@ -166,14 +165,10 @@ pub async fn delete_user(Path(id): Path<i32>) -> Result<impl IntoResponse, AppEr
     responses((status = 200, description = "成功", body = R<UserInfoResp>)),
     tag = "用户管理"
 )]
-pub async fn get_user_info(Extension(username): Extension<Username>) -> Result<impl IntoResponse, AppError> {
+pub async fn get_user_info(State(state): State<AppState>, Extension(username): Extension<Username>) -> Result<impl IntoResponse, AppError> {
     // 查询完整用户信息
-    let user = SysUserService::user_info(username.0.clone())
-        .await
-        .map_err(AppError::Anyhow)?;
-    let menus = SysMenuService::get_menus_by_username(&username.0)
-        .await
-        .map_err(AppError::Anyhow)?;
+    let user = SysUserService::user_info(&state.db, username.0.clone()).await?;
+    let menus = SysMenuService::get_menus_by_username(&state.db, &username.0).await?;
     Ok(R::ok(UserInfoResp {
         username: user.username.unwrap_or_default(),
         nick_name: user.nick_name,
@@ -194,12 +189,11 @@ pub async fn get_user_info(Extension(username): Extension<Username>) -> Result<i
     tag = "用户管理"
 )]
 pub async fn bind_wechat(
+    State(state): State<AppState>,
     Extension(username): Extension<Username>,
     Json(data): Json<WxBindDTO>,
 ) -> Result<impl IntoResponse, AppError> {
-    SysUserService::wx_bind(&username.0, &data.code)
-        .await
-        .map_err(|e| AppError::AuthError(e.to_string()))?;
+    SysUserService::wx_bind(&state.db, &username.0, &data.code).await?;
     Ok(R::ok(()))
 }
 
@@ -212,12 +206,11 @@ pub async fn bind_wechat(
     tag = "用户管理"
 )]
 pub async fn change_password(
+    State(state): State<AppState>,
     Extension(username): Extension<Username>,
     Json(data): Json<ChangePasswordDTO>,
 ) -> Result<impl IntoResponse, AppError> {
-    SysUserService::change_password(&username.0, data.old_password, data.new_password)
-        .await
-        .map_err(|e| AppError::AuthError(e.to_string()))?;
+    SysUserService::change_password(&state.db, &username.0, data.old_password, data.new_password).await?;
     Ok(R::ok(()))
 }
 
@@ -228,12 +221,12 @@ pub async fn change_password(
     responses((status = 200, description = "成功", body = R<service::DashboardStats>)),
     tag = "用户管理"
 )]
-pub async fn dashboard_stats() -> Result<impl IntoResponse, AppError> {
-    let stats = SysUserService::dashboard_stats().await.map_err(AppError::Anyhow)?;
+pub async fn dashboard_stats(State(state): State<AppState>) -> Result<impl IntoResponse, AppError> {
+    let stats = SysUserService::dashboard_stats(&state.db).await?;
     Ok(R::ok(stats))
 }
 
-pub fn routes() -> Router {
+pub fn routes() -> Router<AppState> {
     Router::new()
         .route("/api/user/list", get(list))
         .route("/api/user/register", post(register))

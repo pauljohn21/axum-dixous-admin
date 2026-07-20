@@ -1,4 +1,4 @@
-use axum::extract::{Path, Query};
+use axum::extract::{Path, Query, State};
 use axum::response::IntoResponse;
 use axum::Json;
 use axum::routing::{get, post};
@@ -8,7 +8,7 @@ use model::dto::page_dto::PageRequest;
 use model::dto::page_dto::PageResponse;
 use model::dto::sys_operation_record_dto::{SysOperationRecordInsertDTO, SysOperationRecordUpdateDTO};
 use service::sys_operation_record_service::SysOperationRecordService;
-use utils::prelude::{AppError, R};
+use utils::prelude::{AppError, R, AppState};
 
 #[utoipa::path(
     post,
@@ -17,8 +17,8 @@ use utils::prelude::{AppError, R};
     responses((status = 200, description = "成功", body = R<sys_operation_records::Model>)),
     tag = "操作记录"
 )]
-pub async fn create(Json(data): Json<SysOperationRecordInsertDTO>) -> Result<impl IntoResponse, AppError> {
-    let record = SysOperationRecordService::insert(data).await.map_err(AppError::Anyhow)?;
+pub async fn create(State(state): State<AppState>, Json(data): Json<SysOperationRecordInsertDTO>) -> Result<impl IntoResponse, AppError> {
+    let record = SysOperationRecordService::insert(&state.db, data).await?;
     Ok(R::ok(record))
 }
 
@@ -29,8 +29,8 @@ pub async fn create(Json(data): Json<SysOperationRecordInsertDTO>) -> Result<imp
     responses((status = 200, description = "成功", body = R<PageResponse<sys_operation_records::Model>>)),
     tag = "操作记录"
 )]
-pub async fn list(Query(query): Query<PageRequest>) -> Result<impl IntoResponse, AppError> {
-    let result = SysOperationRecordService::list(query).await.map_err(AppError::Anyhow)?;
+pub async fn list(State(state): State<AppState>, Query(query): Query<PageRequest>) -> Result<impl IntoResponse, AppError> {
+    let result = SysOperationRecordService::list(&state.db, query).await?;
     Ok(R::ok(result))
 }
 
@@ -41,8 +41,8 @@ pub async fn list(Query(query): Query<PageRequest>) -> Result<impl IntoResponse,
     responses((status = 200, description = "成功", body = R<sys_operation_records::Model>)),
     tag = "操作记录"
 )]
-pub async fn get_by_id(Path(id): Path<u64>) -> Result<impl IntoResponse, AppError> {
-    let record = SysOperationRecordService::get_by_id(id).await.map_err(|e| AppError::NotFoundError(e.to_string()))?;
+pub async fn get_by_id(State(state): State<AppState>, Path(id): Path<u64>) -> Result<impl IntoResponse, AppError> {
+    let record = SysOperationRecordService::get_by_id(&state.db, id).await?;
     Ok(R::ok(record))
 }
 
@@ -54,8 +54,8 @@ pub async fn get_by_id(Path(id): Path<u64>) -> Result<impl IntoResponse, AppErro
     responses((status = 200, description = "成功", body = R<sys_operation_records::Model>)),
     tag = "操作记录"
 )]
-pub async fn update(Path(id): Path<u64>, Json(data): Json<SysOperationRecordUpdateDTO>) -> Result<impl IntoResponse, AppError> {
-    let record = SysOperationRecordService::update(id, data).await.map_err(AppError::Anyhow)?;
+pub async fn update(State(state): State<AppState>, Path(id): Path<u64>, Json(data): Json<SysOperationRecordUpdateDTO>) -> Result<impl IntoResponse, AppError> {
+    let record = SysOperationRecordService::update(&state.db, id, data).await?;
     Ok(R::ok(record))
 }
 
@@ -66,12 +66,12 @@ pub async fn update(Path(id): Path<u64>, Json(data): Json<SysOperationRecordUpda
     responses((status = 200, description = "成功", body = R<serde_json::Value>)),
     tag = "操作记录"
 )]
-pub async fn delete_record(Path(id): Path<u64>) -> Result<impl IntoResponse, AppError> {
-    SysOperationRecordService::delete(id).await.map_err(AppError::Anyhow)?;
+pub async fn delete_record(State(state): State<AppState>, Path(id): Path<u64>) -> Result<impl IntoResponse, AppError> {
+    SysOperationRecordService::delete(&state.db, id).await?;
     Ok(R::ok(()))
 }
 
-pub fn routes() -> Router {
+pub fn routes() -> Router<AppState> {
     Router::new()
         .route("/api/operationRecord", post(create))
         .route("/api/operationRecord/list", get(list))

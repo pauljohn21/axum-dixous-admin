@@ -14,5 +14,4 @@ axum = { workspace = true }
 model = { path = "../data/model" }
 service = { path = "../service" }
 utils = { path = "../utils" }
-anyhow = { workspace = true }
 auth-layer = { path = "../auth-layer" }

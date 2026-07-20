@@ -1,4 +1,4 @@
-use axum::extract::{Path, Query};
+use axum::extract::{Path, Query, State};
 use axum::response::IntoResponse;
 use axum::Json;
 use axum::routing::{get, post};
@@ -8,7 +8,7 @@ use model::dto::page_dto::PageRequest;
 use model::dto::page_dto::PageResponse;
 use model::dto::sys_dictionary_dto::{SysDictionaryInsertDTO, SysDictionaryUpdateDTO};
 use service::sys_dictionary_service::SysDictionaryService;
-use utils::prelude::{AppError, R};
+use utils::prelude::{AppError, R, AppState};
 
 #[utoipa::path(
     post,
@@ -17,8 +17,8 @@ use utils::prelude::{AppError, R};
     responses((status = 200, description = "成功", body = R<sys_dictionaries::Model>)),
     tag = "字典管理"
 )]
-pub async fn create(Json(data): Json<SysDictionaryInsertDTO>) -> Result<impl IntoResponse, AppError> {
-    let dict = SysDictionaryService::insert(data).await.map_err(AppError::Anyhow)?;
+pub async fn create(State(state): State<AppState>, Json(data): Json<SysDictionaryInsertDTO>) -> Result<impl IntoResponse, AppError> {
+    let dict = SysDictionaryService::insert(&state.db, data).await?;
     Ok(R::ok(dict))
 }
 
@@ -29,8 +29,8 @@ pub async fn create(Json(data): Json<SysDictionaryInsertDTO>) -> Result<impl Int
     responses((status = 200, description = "成功", body = R<PageResponse<sys_dictionaries::Model>>)),
     tag = "字典管理"
 )]
-pub async fn list(Query(query): Query<PageRequest>) -> Result<impl IntoResponse, AppError> {
-    let result = SysDictionaryService::list(query).await.map_err(AppError::Anyhow)?;
+pub async fn list(State(state): State<AppState>, Query(query): Query<PageRequest>) -> Result<impl IntoResponse, AppError> {
+    let result = SysDictionaryService::list(&state.db, query).await?;
     Ok(R::ok(result))
 }
 
@@ -41,8 +41,8 @@ pub async fn list(Query(query): Query<PageRequest>) -> Result<impl IntoResponse,
     responses((status = 200, description = "成功", body = R<sys_dictionaries::Model>)),
     tag = "字典管理"
 )]
-pub async fn get_by_id(Path(id): Path<u64>) -> Result<impl IntoResponse, AppError> {
-    let dict = SysDictionaryService::get_by_id(id).await.map_err(|e| AppError::NotFoundError(e.to_string()))?;
+pub async fn get_by_id(State(state): State<AppState>, Path(id): Path<u64>) -> Result<impl IntoResponse, AppError> {
+    let dict = SysDictionaryService::get_by_id(&state.db, id).await?;
     Ok(R::ok(dict))
 }
 
@@ -54,8 +54,8 @@ pub async fn get_by_id(Path(id): Path<u64>) -> Result<impl IntoResponse, AppErro
     responses((status = 200, description = "成功", body = R<sys_dictionaries::Model>)),
     tag = "字典管理"
 )]
-pub async fn update(Path(id): Path<u64>, Json(data): Json<SysDictionaryUpdateDTO>) -> Result<impl IntoResponse, AppError> {
-    let dict = SysDictionaryService::update(id, data).await.map_err(AppError::Anyhow)?;
+pub async fn update(State(state): State<AppState>, Path(id): Path<u64>, Json(data): Json<SysDictionaryUpdateDTO>) -> Result<impl IntoResponse, AppError> {
+    let dict = SysDictionaryService::update(&state.db, id, data).await?;
     Ok(R::ok(dict))
 }
 
@@ -66,12 +66,12 @@ pub async fn update(Path(id): Path<u64>, Json(data): Json<SysDictionaryUpdateDTO
     responses((status = 200, description = "成功", body = R<serde_json::Value>)),
     tag = "字典管理"
 )]
-pub async fn delete_dict(Path(id): Path<u64>) -> Result<impl IntoResponse, AppError> {
-    SysDictionaryService::delete(id).await.map_err(AppError::Anyhow)?;
+pub async fn delete_dict(State(state): State<AppState>, Path(id): Path<u64>) -> Result<impl IntoResponse, AppError> {
+    SysDictionaryService::delete(&state.db, id).await?;
     Ok(R::ok(()))
 }
 
-pub fn routes() -> Router {
+pub fn routes() -> Router<AppState> {
     Router::new()
         .route("/api/dictionary", post(create))
         .route("/api/dictionary/list", get(list))

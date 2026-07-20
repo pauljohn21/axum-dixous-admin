@@ -1,4 +1,4 @@
-use axum::extract::{Path, Query};
+use axum::extract::{Path, Query, State};
 use axum::response::IntoResponse;
 use axum::Json;
 use axum::routing::{get, post};
@@ -8,7 +8,7 @@ use model::dto::page_dto::PageRequest;
 use model::dto::page_dto::PageResponse;
 use model::dto::sys_base_menu_param_dto::{SysBaseMenuParamInsertDTO, SysBaseMenuParamUpdateDTO};
 use service::sys_base_menu_param_service::SysBaseMenuParamService;
-use utils::prelude::{AppError, R};
+use utils::prelude::{AppError, R, AppState};
 
 #[utoipa::path(
     post,
@@ -17,8 +17,8 @@ use utils::prelude::{AppError, R};
     responses((status = 200, description = "成功", body = R<sys_base_menu_parameters::Model>)),
     tag = "菜单参数"
 )]
-pub async fn create(Json(data): Json<SysBaseMenuParamInsertDTO>) -> Result<impl IntoResponse, AppError> {
-    let param = SysBaseMenuParamService::insert(data).await.map_err(AppError::Anyhow)?;
+pub async fn create(State(state): State<AppState>, Json(data): Json<SysBaseMenuParamInsertDTO>) -> Result<impl IntoResponse, AppError> {
+    let param = SysBaseMenuParamService::insert(&state.db, data).await?;
     Ok(R::ok(param))
 }
 
@@ -29,8 +29,8 @@ pub async fn create(Json(data): Json<SysBaseMenuParamInsertDTO>) -> Result<impl 
     responses((status = 200, description = "成功", body = R<PageResponse<sys_base_menu_parameters::Model>>)),
     tag = "菜单参数"
 )]
-pub async fn list(Query(query): Query<PageRequest>) -> Result<impl IntoResponse, AppError> {
-    let result = SysBaseMenuParamService::list(query).await.map_err(AppError::Anyhow)?;
+pub async fn list(State(state): State<AppState>, Query(query): Query<PageRequest>) -> Result<impl IntoResponse, AppError> {
+    let result = SysBaseMenuParamService::list(&state.db, query).await?;
     Ok(R::ok(result))
 }
 
@@ -41,8 +41,8 @@ pub async fn list(Query(query): Query<PageRequest>) -> Result<impl IntoResponse,
     responses((status = 200, description = "成功", body = R<sys_base_menu_parameters::Model>)),
     tag = "菜单参数"
 )]
-pub async fn get_by_id(Path(id): Path<u64>) -> Result<impl IntoResponse, AppError> {
-    let param = SysBaseMenuParamService::get_by_id(id).await.map_err(|e| AppError::NotFoundError(e.to_string()))?;
+pub async fn get_by_id(State(state): State<AppState>, Path(id): Path<u64>) -> Result<impl IntoResponse, AppError> {
+    let param = SysBaseMenuParamService::get_by_id(&state.db, id).await?;
     Ok(R::ok(param))
 }
 
@@ -54,8 +54,8 @@ pub async fn get_by_id(Path(id): Path<u64>) -> Result<impl IntoResponse, AppErro
     responses((status = 200, description = "成功", body = R<sys_base_menu_parameters::Model>)),
     tag = "菜单参数"
 )]
-pub async fn update(Path(id): Path<u64>, Json(data): Json<SysBaseMenuParamUpdateDTO>) -> Result<impl IntoResponse, AppError> {
-    let param = SysBaseMenuParamService::update(id, data).await.map_err(AppError::Anyhow)?;
+pub async fn update(State(state): State<AppState>, Path(id): Path<u64>, Json(data): Json<SysBaseMenuParamUpdateDTO>) -> Result<impl IntoResponse, AppError> {
+    let param = SysBaseMenuParamService::update(&state.db, id, data).await?;
     Ok(R::ok(param))
 }
 
@@ -66,12 +66,12 @@ pub async fn update(Path(id): Path<u64>, Json(data): Json<SysBaseMenuParamUpdate
     responses((status = 200, description = "成功", body = R<serde_json::Value>)),
     tag = "菜单参数"
 )]
-pub async fn delete_param(Path(id): Path<u64>) -> Result<impl IntoResponse, AppError> {
-    SysBaseMenuParamService::delete(id).await.map_err(AppError::Anyhow)?;
+pub async fn delete_param(State(state): State<AppState>, Path(id): Path<u64>) -> Result<impl IntoResponse, AppError> {
+    SysBaseMenuParamService::delete(&state.db, id).await?;
     Ok(R::ok(()))
 }
 
-pub fn routes() -> Router {
+pub fn routes() -> Router<AppState> {
     Router::new()
         .route("/api/menuParam", post(create))
         .route("/api/menuParam/list", get(list))

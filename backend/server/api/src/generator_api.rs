@@ -3,7 +3,7 @@
 //! 提供历史记录 CRUD、回滚、从数据库创建等功能。
 //! 配置以 JSON 格式存储在 sys_generator_history.request 字段。
 
-use axum::extract::{Path, Query};
+use axum::extract::{Path, Query, State};
 use axum::response::IntoResponse;
 use axum::Json;
 use axum::routing::{get, post};
@@ -17,7 +17,7 @@ use model::dto::sys_generator_history_dto::{
 };
 use service::generator_code_service::GeneratorCodeService;
 use service::generator_history_service::GeneratorHistoryService;
-use utils::prelude::{AppError, R};
+use utils::prelude::{AppError, AppState, R};
 
 // ===== 历史 CRUD =====
 
@@ -29,11 +29,10 @@ use utils::prelude::{AppError, R};
     tag = "代码生成器"
 )]
 pub async fn create_history(
+    State(state): State<AppState>,
     Json(data): Json<SysGeneratorHistoryInsertDTO>,
 ) -> Result<impl IntoResponse, AppError> {
-    let record = GeneratorHistoryService::insert(data)
-        .await
-        .map_err(AppError::Anyhow)?;
+    let record = GeneratorHistoryService::insert(&state.db, data).await?;
     Ok(R::ok(record))
 }
 
@@ -45,11 +44,10 @@ pub async fn create_history(
     tag = "代码生成器"
 )]
 pub async fn list_history(
+    State(state): State<AppState>,
     Query(query): Query<PageRequest>,
 ) -> Result<impl IntoResponse, AppError> {
-    let result = GeneratorHistoryService::list(query)
-        .await
-        .map_err(AppError::Anyhow)?;
+    let result = GeneratorHistoryService::list(&state.db, query).await?;
     Ok(R::ok(result))
 }
 
@@ -61,11 +59,10 @@ pub async fn list_history(
     tag = "代码生成器"
 )]
 pub async fn get_history_by_id(
+    State(state): State<AppState>,
     Path(id): Path<u64>,
 ) -> Result<impl IntoResponse, AppError> {
-    let record = GeneratorHistoryService::get_by_id(id)
-        .await
-        .map_err(|e| AppError::NotFoundError(e.to_string()))?;
+    let record = GeneratorHistoryService::get_by_id(&state.db, id).await?;
     Ok(R::ok(record))
 }
 
@@ -77,11 +74,10 @@ pub async fn get_history_by_id(
     tag = "代码生成器"
 )]
 pub async fn get_history_meta(
+    State(state): State<AppState>,
     Path(id): Path<u64>,
 ) -> Result<impl IntoResponse, AppError> {
-    let meta = GeneratorHistoryService::get_meta(id)
-        .await
-        .map_err(AppError::Anyhow)?;
+    let meta = GeneratorHistoryService::get_meta(&state.db, id).await?;
     Ok(R::ok(meta))
 }
 
@@ -94,12 +90,11 @@ pub async fn get_history_meta(
     tag = "代码生成器"
 )]
 pub async fn update_history(
+    State(state): State<AppState>,
     Path(id): Path<u64>,
     Json(data): Json<SysGeneratorHistoryUpdateDTO>,
 ) -> Result<impl IntoResponse, AppError> {
-    let record = GeneratorHistoryService::update(id, data)
-        .await
-        .map_err(AppError::Anyhow)?;
+    let record = GeneratorHistoryService::update(&state.db, id, data).await?;
     Ok(R::ok(record))
 }
 
@@ -111,11 +106,10 @@ pub async fn update_history(
     tag = "代码生成器"
 )]
 pub async fn delete_history(
+    State(state): State<AppState>,
     Path(id): Path<u64>,
 ) -> Result<impl IntoResponse, AppError> {
-    GeneratorHistoryService::delete(id)
-        .await
-        .map_err(AppError::Anyhow)?;
+    GeneratorHistoryService::delete(&state.db, id).await?;
     Ok(R::ok(()))
 }
 
@@ -129,11 +123,10 @@ pub async fn delete_history(
     tag = "代码生成器"
 )]
 pub async fn rollback(
+    State(state): State<AppState>,
     Json(data): Json<GeneratorRollbackDTO>,
 ) -> Result<impl IntoResponse, AppError> {
-    GeneratorHistoryService::rollback(data)
-        .await
-        .map_err(AppError::Anyhow)?;
+    GeneratorHistoryService::rollback(&state.db, data).await?;
     Ok(R::ok(()))
 }
 
@@ -145,10 +138,8 @@ pub async fn rollback(
     responses((status = 200, description = "成功", body = R<Vec<DatabaseInfo>>)),
     tag = "代码生成器"
 )]
-pub async fn get_databases() -> Result<impl IntoResponse, AppError> {
-    let databases = GeneratorHistoryService::get_databases()
-        .await
-        .map_err(AppError::Anyhow)?;
+pub async fn get_databases(State(state): State<AppState>) -> Result<impl IntoResponse, AppError> {
+    let databases = GeneratorHistoryService::get_databases(&state.db).await?;
     Ok(R::ok(databases))
 }
 
@@ -160,11 +151,10 @@ pub async fn get_databases() -> Result<impl IntoResponse, AppError> {
     tag = "代码生成器"
 )]
 pub async fn get_tables(
+    State(state): State<AppState>,
     Query(params): Query<GenerateFromTableDTO>,
 ) -> Result<impl IntoResponse, AppError> {
-    let tables = GeneratorHistoryService::get_tables(&params.db_name)
-        .await
-        .map_err(AppError::Anyhow)?;
+    let tables = GeneratorHistoryService::get_tables(&state.db, &params.db_name).await?;
     Ok(R::ok(tables))
 }
 
@@ -179,11 +169,10 @@ pub async fn get_tables(
     tag = "代码生成器"
 )]
 pub async fn get_columns(
+    State(state): State<AppState>,
     Query(params): Query<GenerateFromTableDTO>,
 ) -> Result<impl IntoResponse, AppError> {
-    let columns = GeneratorHistoryService::get_columns(&params.db_name, &params.table_name)
-        .await
-        .map_err(AppError::Anyhow)?;
+    let columns = GeneratorHistoryService::get_columns(&state.db, &params.db_name, &params.table_name).await?;
     Ok(R::ok(columns))
 }
 
@@ -195,11 +184,10 @@ pub async fn get_columns(
     tag = "代码生成器"
 )]
 pub async fn generate_from_table(
+    State(state): State<AppState>,
     Json(data): Json<GenerateFromTableDTO>,
 ) -> Result<impl IntoResponse, AppError> {
-    let yaml = GeneratorHistoryService::generate_from_table(data)
-        .await
-        .map_err(AppError::Anyhow)?;
+    let yaml = GeneratorHistoryService::generate_from_table(&state.db, data).await?;
     Ok(R::ok(yaml))
 }
 
@@ -215,15 +203,13 @@ pub async fn generate_from_table(
 pub async fn preview_code(
     Json(data): Json<PreviewCodeDTO>,
 ) -> Result<impl IntoResponse, AppError> {
-    let result = GeneratorCodeService::preview_code(data)
-        .await
-        .map_err(AppError::Anyhow)?;
+    let result = GeneratorCodeService::preview_code(data).await?;
     Ok(R::ok(result))
 }
 
 // ===== 路由 =====
 
-pub fn routes() -> Router {
+pub fn routes() -> Router<AppState> {
     Router::new()
         // 历史 CRUD
         .route("/api/generator/history", post(create_history))

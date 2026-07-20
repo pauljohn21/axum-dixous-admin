@@ -1,4 +1,4 @@
-use axum::extract::{Path, Query};
+use axum::extract::{Path, Query, State};
 use axum::response::IntoResponse;
 use axum::Json;
 use axum::routing::{get, post};
@@ -8,7 +8,7 @@ use model::dto::page_dto::PageRequest;
 use model::dto::page_dto::PageResponse;
 use model::dto::sys_data_role_dto::SysDataRoleInsertDTO;
 use service::sys_data_role_service::SysDataRoleService;
-use utils::prelude::{AppError, R};
+use utils::prelude::{AppError, R, AppState};
 use serde::Deserialize;
 use utoipa::IntoParams;
 
@@ -25,8 +25,8 @@ pub struct CompositeIdPath {
     responses((status = 200, description = "成功", body = R<sys_data_role_id::Model>)),
     tag = "数据权限"
 )]
-pub async fn create(Json(data): Json<SysDataRoleInsertDTO>) -> Result<impl IntoResponse, AppError> {
-    let record = SysDataRoleService::insert(data).await.map_err(AppError::Anyhow)?;
+pub async fn create(State(state): State<AppState>, Json(data): Json<SysDataRoleInsertDTO>) -> Result<impl IntoResponse, AppError> {
+    let record = SysDataRoleService::insert(&state.db, data).await?;
     Ok(R::ok(record))
 }
 
@@ -37,8 +37,8 @@ pub async fn create(Json(data): Json<SysDataRoleInsertDTO>) -> Result<impl IntoR
     responses((status = 200, description = "成功", body = R<PageResponse<sys_data_role_id::Model>>)),
     tag = "数据权限"
 )]
-pub async fn list(Query(query): Query<PageRequest>) -> Result<impl IntoResponse, AppError> {
-    let result = SysDataRoleService::list(query).await.map_err(AppError::Anyhow)?;
+pub async fn list(State(state): State<AppState>, Query(query): Query<PageRequest>) -> Result<impl IntoResponse, AppError> {
+    let result = SysDataRoleService::list(&state.db, query).await?;
     Ok(R::ok(result))
 }
 
@@ -52,10 +52,10 @@ pub async fn list(Query(query): Query<PageRequest>) -> Result<impl IntoResponse,
     responses((status = 200, description = "成功", body = R<sys_data_role_id::Model>)),
     tag = "数据权限"
 )]
-pub async fn get_by_composite_id(Path(path): Path<CompositeIdPath>) -> Result<impl IntoResponse, AppError> {
-    let record = SysDataRoleService::get_by_composite_id(path.sys_role_role_id, path.data_role_id_role_id)
+pub async fn get_by_composite_id(State(state): State<AppState>, Path(path): Path<CompositeIdPath>) -> Result<impl IntoResponse, AppError> {
+    let record = SysDataRoleService::get_by_composite_id(&state.db, path.sys_role_role_id, path.data_role_id_role_id)
         .await
-        .map_err(|e| AppError::NotFoundError(e.to_string()))?;
+        ?;
     Ok(R::ok(record))
 }
 
@@ -69,14 +69,14 @@ pub async fn get_by_composite_id(Path(path): Path<CompositeIdPath>) -> Result<im
     responses((status = 200, description = "成功", body = R<serde_json::Value>)),
     tag = "数据权限"
 )]
-pub async fn delete_data_role(Path(path): Path<CompositeIdPath>) -> Result<impl IntoResponse, AppError> {
-    SysDataRoleService::delete(path.sys_role_role_id, path.data_role_id_role_id)
+pub async fn delete_data_role(State(state): State<AppState>, Path(path): Path<CompositeIdPath>) -> Result<impl IntoResponse, AppError> {
+    SysDataRoleService::delete(&state.db, path.sys_role_role_id, path.data_role_id_role_id)
         .await
-        .map_err(AppError::Anyhow)?;
+        ?;
     Ok(R::ok(()))
 }
 
-pub fn routes() -> Router {
+pub fn routes() -> Router<AppState> {
     Router::new()
         .route("/api/dataRole", post(create))
         .route("/api/dataRole/list", get(list))

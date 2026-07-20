@@ -1,4 +1,4 @@
-use axum::extract::{Path, Query};
+use axum::extract::{Path, Query, State};
 use axum::response::IntoResponse;
 use axum::Json;
 use axum::routing::{get, post};
@@ -7,7 +7,7 @@ use model::dao::jwt_blacklists;
 use model::dto::page_dto::{PageRequest, PageResponse};
 use model::dto::jwt_blacklist_dto::{JwtBlacklistInsertDTO, JwtBlacklistUpdateDTO};
 use service::jwt_blacklist_service::JwtBlacklistService;
-use utils::prelude::{AppError, R};
+use utils::prelude::{AppError, R, AppState};
 
 #[utoipa::path(
     post,
@@ -16,8 +16,8 @@ use utils::prelude::{AppError, R};
     responses((status = 200, description = "成功", body = R<jwt_blacklists::Model>)),
     tag = "JWT管理"
 )]
-pub async fn create(Json(data): Json<JwtBlacklistInsertDTO>) -> Result<impl IntoResponse, AppError> {
-    let record = JwtBlacklistService::insert(data).await.map_err(AppError::Anyhow)?;
+pub async fn create(State(state): State<AppState>, Json(data): Json<JwtBlacklistInsertDTO>) -> Result<impl IntoResponse, AppError> {
+    let record = JwtBlacklistService::insert(&state.db, data).await?;
     Ok(R::ok(record))
 }
 
@@ -28,8 +28,8 @@ pub async fn create(Json(data): Json<JwtBlacklistInsertDTO>) -> Result<impl Into
     responses((status = 200, description = "成功", body = R<PageResponse<jwt_blacklists::Model>>)),
     tag = "JWT管理"
 )]
-pub async fn list(Query(query): Query<PageRequest>) -> Result<impl IntoResponse, AppError> {
-    let result = JwtBlacklistService::list(query).await.map_err(AppError::Anyhow)?;
+pub async fn list(State(state): State<AppState>, Query(query): Query<PageRequest>) -> Result<impl IntoResponse, AppError> {
+    let result = JwtBlacklistService::list(&state.db, query).await?;
     Ok(R::ok(result))
 }
 
@@ -40,8 +40,8 @@ pub async fn list(Query(query): Query<PageRequest>) -> Result<impl IntoResponse,
     responses((status = 200, description = "成功", body = R<jwt_blacklists::Model>)),
     tag = "JWT管理"
 )]
-pub async fn get_by_id(Path(id): Path<u64>) -> Result<impl IntoResponse, AppError> {
-    let record = JwtBlacklistService::get_by_id(id).await.map_err(|e| AppError::NotFoundError(e.to_string()))?;
+pub async fn get_by_id(State(state): State<AppState>, Path(id): Path<u64>) -> Result<impl IntoResponse, AppError> {
+    let record = JwtBlacklistService::get_by_id(&state.db, id).await?;
     Ok(R::ok(record))
 }
 
@@ -53,8 +53,8 @@ pub async fn get_by_id(Path(id): Path<u64>) -> Result<impl IntoResponse, AppErro
     responses((status = 200, description = "成功", body = R<jwt_blacklists::Model>)),
     tag = "JWT管理"
 )]
-pub async fn update(Path(id): Path<u64>, Json(data): Json<JwtBlacklistUpdateDTO>) -> Result<impl IntoResponse, AppError> {
-    let record = JwtBlacklistService::update(id, data).await.map_err(AppError::Anyhow)?;
+pub async fn update(State(state): State<AppState>, Path(id): Path<u64>, Json(data): Json<JwtBlacklistUpdateDTO>) -> Result<impl IntoResponse, AppError> {
+    let record = JwtBlacklistService::update(&state.db, id, data).await?;
     Ok(R::ok(record))
 }
 
@@ -65,12 +65,12 @@ pub async fn update(Path(id): Path<u64>, Json(data): Json<JwtBlacklistUpdateDTO>
     responses((status = 200, description = "成功", body = R<serde_json::Value>)),
     tag = "JWT管理"
 )]
-pub async fn delete_jwt(Path(id): Path<u64>) -> Result<impl IntoResponse, AppError> {
-    JwtBlacklistService::delete(id).await.map_err(AppError::Anyhow)?;
+pub async fn delete_jwt(State(state): State<AppState>, Path(id): Path<u64>) -> Result<impl IntoResponse, AppError> {
+    JwtBlacklistService::delete(&state.db, id).await?;
     Ok(R::ok(()))
 }
 
-pub fn routes() -> Router {
+pub fn routes() -> Router<AppState> {
     Router::new()
         .route("/api/jwtBlacklist", post(create))
         .route("/api/jwtBlacklist/list", get(list))
