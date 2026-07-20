@@ -1,0 +1,86 @@
+<!--pages/dicts/dicts.wxml-->
+<view class="dicts-page {{themeClass}}">
+  <!-- 搜索栏 -->
+  <view class="search-bar">
+    <input
+      class="search-input"
+      placeholder="搜索字典名称/类型"
+      value="{{keyword}}"
+      bindinput="onSearchInput"
+      bindconfirm="onSearch"
+    />
+    <button class="search-btn" size="mini" bindtap="onSearch">搜索</button>
+  </view>
+
+  <!-- 字典列表 -->
+  <view class="card">
+    <!-- 骨架屏 -->
+    <block wx:if="{{loading && dicts.length === 0}}">
+      <view class="skeleton-dict" wx:for="{{[1,2,3,4]}}" wx:key="*this">
+        <view class="skeleton-block skeleton-dict-line"></view>
+        <view class="skeleton-block skeleton-dict-line" style="width: 50%;"></view>
+      </view>
+    </block>
+
+    <!-- 字典数据 -->
+    <block wx:if="{{!loading || dicts.length > 0}}">
+      <view class="dict-item" wx:for="{{dicts}}" wx:key="id" bindtap="onDictTap" data-id="{{item.id}}" hover-class="dict-hover">
+        <view class="dict-info">
+          <view class="dict-header">
+            <text class="dict-name">{{item.name || '未命名'}}</text>
+            <text class="tag {{item.status ? 'tag-success' : 'tag-danger'}}">{{item.status ? '启用' : '禁用'}}</text>
+          </view>
+          <view class="dict-meta">
+            <text class="dict-type">{{item.type || '-'}}</text>
+            <text class="dict-desc">{{item.desc || '无描述'}}</text>
+          </view>
+        </view>
+        <text class="dict-arrow">›</text>
+      </view>
+    </block>
+
+    <!-- 空状态 -->
+    <view wx:if="{{!loading && dicts.length === 0}}" class="empty-state">
+      <text>暂无字典数据</text>
+    </view>
+
+    <!-- 加载状态 -->
+    <view wx:if="{{loading && dicts.length > 0}}" class="loading-state">
+      <text>加载中...</text>
+    </view>
+
+    <!-- 底部状态 -->
+    <view wx:if="{{!loading && dicts.length > 0 && !hasMore}}" class="end-state">
+      <text>共 {{total}} 条记录</text>
+    </view>
+  </view>
+
+  <!-- 详情弹窗 -->
+  <view wx:if="{{showDetail}}" class="modal-mask" bindtap="onDetailClose">
+    <view class="modal-content" catchtap="stopPropagation">
+      <view class="modal-header">
+        <text class="modal-title">字典详情</text>
+        <text class="modal-close" bindtap="onDetailClose">✕</text>
+      </view>
+
+      <view class="info-row">
+        <text class="info-label">名称</text>
+        <text class="info-value">{{selectedDict.name || '-'}}</text>
+      </view>
+      <view class="info-row">
+        <text class="info-label">类型</text>
+        <text class="info-value">{{selectedDict.type || '-'}}</text>
+      </view>
+      <view class="info-row">
+        <text class="info-label">状态</text>
+        <text class="info-value {{selectedDict.status ? 'text-success' : 'text-danger'}}">
+          {{selectedDict.status ? '启用' : '禁用'}}
+        </text>
+      </view>
+      <view class="info-row">
+        <text class="info-label">描述</text>
+        <text class="info-value">{{selectedDict.desc || '-'}}</text>
+      </view>
+    </view>
+  </view>
+</view>
