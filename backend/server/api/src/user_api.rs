@@ -11,7 +11,6 @@ use model::dto::page_dto::{PageRequest, PageResponse};
 use model::dto::sys_user_dto::{LoginDTO, SysUserInsertDTO, SysUserUpdateDTO};
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
-use service::jwt_blacklist_service::JwtBlacklistService;
 use service::sys_menu_service::SysMenuService;
 use service::sys_user_service::SysUserService;
 use utils::prelude::{AppError, AppState, R, create_token};
@@ -100,11 +99,15 @@ pub async fn register(State(state): State<AppState>, Json(data): Json<SysUserIns
 pub async fn logout(State(state): State<AppState>, req: Request) -> Result<impl IntoResponse, AppError> {
     if let Some(auth_header) = req.headers().get(AUTHORIZATION).and_then(|v| v.to_str().ok()) {
         if let Some(token) = auth_header.strip_prefix("Bearer ") {
-            // 将 token 加入 JWT 黑名单
-            let dto = model::dto::jwt_blacklist_dto::JwtBlacklistInsertDTO {
-                jwt: Some(token.to_string()),
-            };
-            let _ = JwtBlacklistService::insert(&state.db, dto).await;
+            // 将 token 加入 Redis 黑名单（TTL = JWT 过期时间）
+            let token_key = format!("jwt:blacklist:{}", token);
+            let expire_seconds = state.config.jwt.expire_hours as u64 * 3600;
+            let _ = redis::cmd("SETEX")
+                .arg(&token_key)
+                .arg(expire_seconds)
+                .arg("1")
+                .query_async::<()>(&mut state.redis.clone())
+                .await;
         }
     }
     Ok(R::ok(()))

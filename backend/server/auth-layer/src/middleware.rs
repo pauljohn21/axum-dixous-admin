@@ -5,8 +5,7 @@ use casbin::{CachedEnforcer, CoreApi};
 use futures::future::BoxFuture;
 use tower::Layer;
 use utils::prelude::{verify_token, DB};
-use model::dao::jwt_blacklists;
-use sea_orm::{ColumnTrait, EntityTrait, QueryFilter};
+use redis::AsyncCommands;
 
 use std::sync::Arc;
 use tokio::sync::RwLock;
@@ -100,13 +99,11 @@ where
         let mut inner = std::mem::replace(&mut self.inner, inner);
 
         Box::pin(async move {
-            // JWT 黑名单检查
-            let db = DB::db_connection().await;
-            let blacklisted = jwt_blacklists::Entity::find()
-                .filter(jwt_blacklists::Column::Jwt.eq(&token_str))
-                .one(db)
-                .await;
-            if let Ok(Some(_)) = blacklisted {
+            // JWT 黑名单检查 — Redis O(1) 查询
+            let mut redis = DB::redis_connection().await.clone();
+            let token_key = format!("jwt:blacklist:{}", token_str);
+            let exists: bool = redis.exists(&token_key).await.unwrap_or(false);
+            if exists {
                 return Ok(StatusCode::UNAUTHORIZED.into_response());
             }
 

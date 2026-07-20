@@ -15,3 +15,4 @@ model = { path = "../data/model" }
 service = { path = "../service" }
 utils = { path = "../utils" }
 auth-layer = { path = "../auth-layer" }
+redis = { workspace = true }

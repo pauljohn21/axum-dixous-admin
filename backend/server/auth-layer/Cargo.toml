@@ -14,3 +14,4 @@ utils = { workspace = true }
 tracing = { workspace = true }
 model = { workspace = true }
 sea-orm = { workspace = true }
+redis = { workspace = true }
