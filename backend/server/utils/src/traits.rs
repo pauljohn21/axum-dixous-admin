@@ -15,7 +15,7 @@ use model::dto::sys_api_dto::{SysApiInsertDTO, SysApiUpdateDTO};
 use crate::error::ServiceError;
 
 /// 仪表盘统计数据
-#[derive(serde::Serialize, utoipa::ToSchema)]
+#[derive(serde::Serialize, serde::Deserialize, utoipa::ToSchema, Clone)]
 pub struct DashboardStats {
     pub user_count: u64,
     pub role_count: u64,

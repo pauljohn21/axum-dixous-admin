@@ -8,7 +8,8 @@ use model::dto::page_dto::PageRequest;
 use model::dto::page_dto::PageResponse;
 use model::dto::sys_dictionary_dto::{SysDictionaryInsertDTO, SysDictionaryUpdateDTO};
 use service::sys_dictionary_service::SysDictionaryService;
-use utils::prelude::{AppError, R, AppState};
+use utils::cache::keys;
+use utils::prelude::{AppError, Cache, R, AppState};
 
 #[utoipa::path(
     post,
@@ -19,6 +20,7 @@ use utils::prelude::{AppError, R, AppState};
 )]
 pub async fn create(State(state): State<AppState>, Json(data): Json<SysDictionaryInsertDTO>) -> Result<impl IntoResponse, AppError> {
     let dict = SysDictionaryService::insert(&state.db, data).await?;
+    Cache::del(&mut state.redis.clone(), keys::DASHBOARD_STATS).await;
     Ok(R::ok(dict))
 }
 
@@ -56,6 +58,7 @@ pub async fn get_by_id(State(state): State<AppState>, Path(id): Path<u64>) -> Re
 )]
 pub async fn update(State(state): State<AppState>, Path(id): Path<u64>, Json(data): Json<SysDictionaryUpdateDTO>) -> Result<impl IntoResponse, AppError> {
     let dict = SysDictionaryService::update(&state.db, id, data).await?;
+    Cache::del(&mut state.redis.clone(), keys::DASHBOARD_STATS).await;
     Ok(R::ok(dict))
 }
 
@@ -68,6 +71,7 @@ pub async fn update(State(state): State<AppState>, Path(id): Path<u64>, Json(dat
 )]
 pub async fn delete_dict(State(state): State<AppState>, Path(id): Path<u64>) -> Result<impl IntoResponse, AppError> {
     SysDictionaryService::delete(&state.db, id).await?;
+    Cache::del(&mut state.redis.clone(), keys::DASHBOARD_STATS).await;
     Ok(R::ok(()))
 }
 

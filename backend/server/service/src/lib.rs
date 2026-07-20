@@ -21,7 +21,7 @@ pub mod generator_history_service;
 pub mod generator_code_service;
 
 /// 仪表盘统计数据
-#[derive(serde::Serialize, utoipa::ToSchema)]
+#[derive(serde::Serialize, serde::Deserialize, utoipa::ToSchema, Clone)]
 pub struct DashboardStats {
     pub user_count: u64,
     pub role_count: u64,

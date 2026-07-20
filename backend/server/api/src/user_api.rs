@@ -13,7 +13,8 @@ use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 use service::sys_menu_service::SysMenuService;
 use service::sys_user_service::SysUserService;
-use utils::prelude::{AppError, AppState, R, create_token};
+use utils::cache::keys;
+use utils::prelude::{AppError, AppState, Cache, R, create_token};
 
 #[derive(Serialize, ToSchema)]
 pub struct LoginResp { pub token: String }
@@ -85,8 +86,9 @@ pub async fn wx_login(State(state): State<AppState>, Json(data): Json<WxLoginDTO
     tag = "用户管理"
 )]
 pub async fn register(State(state): State<AppState>, Json(data): Json<SysUserInsertDTO>) -> Result<impl IntoResponse, AppError> {
-    SysUserService::insert(&state.db, data).await?;
-    Ok(R::ok(()))
+SysUserService::insert(&state.db, data).await?;
+Cache::del(&mut state.redis.clone(), keys::DASHBOARD_STATS).await;
+Ok(R::ok(()))
 }
 
 /// 退出登录 — 将当前 token 加入黑名单
@@ -144,8 +146,9 @@ pub async fn get_by_id(State(state): State<AppState>, Path(id): Path<i32>) -> Re
     tag = "用户管理"
 )]
 pub async fn update(State(state): State<AppState>, Path(id): Path<i32>, Json(data): Json<SysUserUpdateDTO>) -> Result<impl IntoResponse, AppError> {
-    let user = SysUserService::update(&state.db, id, data).await?;
-    Ok(R::ok(user))
+let user = SysUserService::update(&state.db, id, data).await?;
+Cache::del(&mut state.redis.clone(), keys::DASHBOARD_STATS).await;
+Ok(R::ok(user))
 }
 
 #[utoipa::path(
@@ -156,8 +159,9 @@ pub async fn update(State(state): State<AppState>, Path(id): Path<i32>, Json(dat
     tag = "用户管理"
 )]
 pub async fn delete_user(State(state): State<AppState>, Path(id): Path<i32>) -> Result<impl IntoResponse, AppError> {
-    SysUserService::delete(&state.db, id).await?;
-    Ok(R::ok(()))
+SysUserService::delete(&state.db, id).await?;
+Cache::del(&mut state.redis.clone(), keys::DASHBOARD_STATS).await;
+Ok(R::ok(()))
 }
 
 #[utoipa::path(
@@ -223,7 +227,14 @@ pub async fn change_password(
     tag = "用户管理"
 )]
 pub async fn dashboard_stats(State(state): State<AppState>) -> Result<impl IntoResponse, AppError> {
+    // 先查缓存
+    if let Some(cached) = Cache::get::<service::DashboardStats>(&mut state.redis.clone(), keys::DASHBOARD_STATS).await {
+        return Ok(R::ok(cached));
+    }
+    // Miss → 查 DB（已并行化）
     let stats = SysUserService::dashboard_stats(&state.db).await?;
+    // 回填缓存
+    Cache::set(&mut state.redis.clone(), keys::DASHBOARD_STATS, &stats, keys::DASHBOARD_TTL).await;
     Ok(R::ok(stats))
 }
 
