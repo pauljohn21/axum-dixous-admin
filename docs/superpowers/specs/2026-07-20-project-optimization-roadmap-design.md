@@ -179,9 +179,20 @@ tests/
 │   ├── menu_service_test.rs
 │   └── casbin_test.rs        # 权限规则测试
 └── api/
-    ├── user_api_test.rs       # HTTP 端到端测试 (tower::ServiceExt::oneshot)
+    ├── user_api_test.rs       # HTTP 路由测试 (tower::ServiceExt::oneshot)
     └── auth_api_test.rs       # 登录/登出/JWT 黑名单测试
 ```
+
+**测试分层说明：**
+
+| 层级 | 名称 | 说明 | 工具 |
+|------|------|------|------|
+| L1 | 单元测试 | 纯函数测试（如 `build_page_query`、DTO 序列化） | `#[test]` |
+| L2 | Mock 测试 | Trait + Mock 实现，不碰 DB | 现有的 7 个测试 |
+| L3 | 集成测试 | 真实 DB + Service 层调用 | SeaORM + 测试数据库 |
+| L4 | HTTP 路由测试 | `Router::oneshot(request)` 完整路由链（含中间件） | `tower::ServiceExt` |
+
+> **注：** 本项目是纯 Rust 全栈应用，前端编译为 WASM 客户端渲染，无需浏览器自动化测试。L4 的 `tower::ServiceExt::oneshot` 在内存中模拟 HTTP 请求，不启动真实服务器，属于 HTTP 层集成测试，不是 E2E 测试。
 
 ### 5.2 测试 DB 策略
 
@@ -206,8 +217,8 @@ tests/
 | P0 | CRUD 基础 | User/Role/Menu 的增删改查 | 集成 |
 | P1 | Casbin 权限 | 有权限/无权限/路由匹配 | 集成 |
 | P1 | 分页查询 | 关键词搜索/分页边界 | 集成 |
-| P2 | API 端到端 | 完整 HTTP 请求→响应 | E2E |
-| P2 | 错误转换 | ServiceError → HTTP 状态码 | E2E |
+| P2 | HTTP 路由 | 完整 HTTP 请求→响应（含中间件链） | 路由测试 |
+| P2 | 错误转换 | ServiceError → HTTP 状态码 | 路由测试 |
 
 ### 5.5 Mock 测试扩展
 
@@ -222,7 +233,8 @@ Dioxus 0.7 前端测试能力有限，采用务实策略：
 | API 层逻辑测试 | 测试 `build_page_query`、URL 构建等纯函数 | 高 |
 | Model 序列化测试 | 测试 DTO 的 serde 序列化/反序列化 | 高 |
 | 组件渲染测试 | Dioxus 0.7 尚无成熟方案 | 暂不做 |
-| E2E 测试 | 后续可考虑 Playwright 驱动 WASM | 未来 |
+
+> **不做 E2E 测试：** 本项目前端为 Dioxus 0.7 WASM 客户端渲染，无成熟浏览器自动化测试方案。投入产出比低，不纳入计划。
 
 前端测试目录：
 - `web/src/http/mod.rs` — 新增 `#[cfg(test)]` 模块，测试 `build_page_query` 等
@@ -233,7 +245,7 @@ Dioxus 0.7 前端测试能力有限，采用务实策略：
 - [ ] 后端集成测试覆盖 User/Role/Menu CRUD 核心路径
 - [ ] JWT 黑名单登出测试通过
 - [ ] Casbin 权限规则测试通过
-- [ ] API 端到端测试至少覆盖登录 + 一个 CRUD 操作
+- [ ] HTTP 路由测试至少覆盖登录 + 一个 CRUD 操作（`tower::ServiceExt::oneshot`）
 - [ ] Mock 测试扩展到 4 个 Service（User/Role/Menu/Api）
 - [ ] 前端纯函数测试覆盖 HTTP 层和 Model 序列化
 - [ ] `cargo test` 全量通过，测试数 > 20
