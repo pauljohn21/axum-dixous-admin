@@ -30,7 +30,7 @@ pub async fn list(State(state): State<AppState>, Query(query): Query<PageRequest
     responses((status = 200, description = "成功", body = R<casbin_rule::Model>)),
     tag = "Casbin策略"
 )]
-pub async fn get_by_id(State(state): State<AppState>, Path(id): Path<u64>) -> Result<impl IntoResponse, AppError> {
+pub async fn get_by_id(State(state): State<AppState>, Path(id): Path<i64>) -> Result<impl IntoResponse, AppError> {
     let rule = CasbinService::get_by_id(&state.db, id).await?;
     Ok(R::ok(rule))
 }
@@ -54,7 +54,7 @@ pub async fn create(State(state): State<AppState>, Json(request): Json<CreateCas
     responses((status = 200, description = "更新成功", body = R<casbin_rule::Model>)),
     tag = "Casbin策略"
 )]
-pub async fn update(State(state): State<AppState>, Path(id): Path<u64>, Json(request): Json<UpdateCasbinRuleRequest>) -> Result<impl IntoResponse, AppError> {
+pub async fn update(State(state): State<AppState>, Path(id): Path<i64>, Json(request): Json<UpdateCasbinRuleRequest>) -> Result<impl IntoResponse, AppError> {
     let rule = CasbinService::update(&state.db, &state.enforcer, id, request).await?;
     Ok(R::ok(rule))
 }
@@ -66,14 +66,14 @@ pub async fn update(State(state): State<AppState>, Path(id): Path<u64>, Json(req
     responses((status = 200, description = "删除成功", body = R<serde_json::Value>)),
     tag = "Casbin策略"
 )]
-pub async fn delete(State(state): State<AppState>, Path(id): Path<u64>) -> Result<impl IntoResponse, AppError> {
+pub async fn delete(State(state): State<AppState>, Path(id): Path<i64>) -> Result<impl IntoResponse, AppError> {
     CasbinService::delete(&state.db, &state.enforcer, id).await?;
     Ok(R::ok(()))
 }
 
 #[derive(Deserialize, Serialize, ToSchema)]
 pub struct BatchDeleteRequest {
-    pub ids: Vec<u64>,
+    pub ids: Vec<i64>,
 }
 
 #[utoipa::path(
@@ -101,19 +101,22 @@ pub struct UpdateRolePoliciesRequest {
 
 #[utoipa::path(
     put,
-    path = "/api/casbin/role/{role}",
+    path = "/api/casbin/role/{role}/domain/{domain}",
     request_body = UpdateRolePoliciesRequest,
-    params(("role" = String, Path, description = "角色名称")),
+    params(
+        ("role" = String, Path, description = "角色名称"),
+        ("domain" = String, Path, description = "域名称"),
+    ),
     responses((status = 200, description = "权限策略更新成功", body = R<serde_json::Value>)),
     tag = "Casbin策略"
 )]
-pub async fn update_role_policies(State(state): State<AppState>, Path(role): Path<String>, Json(req): Json<UpdateRolePoliciesRequest>) -> Result<impl IntoResponse, AppError> {
+pub async fn update_role_policies(State(state): State<AppState>, Path((role, domain)): Path<(String, String)>, Json(req): Json<UpdateRolePoliciesRequest>) -> Result<impl IntoResponse, AppError> {
     let policies: Vec<(String, String)> = req.casbin_infos
         .into_iter()
         .map(|info| (info.path, info.method))
         .collect();
 
-    CasbinService::update_role_policies(&state.db, &state.enforcer, &role, policies)
+    CasbinService::update_role_policies(&state.db, &state.enforcer, &role, &domain, policies)
         .await?;
 
     Ok(R::ok(()))
@@ -121,13 +124,16 @@ pub async fn update_role_policies(State(state): State<AppState>, Path(role): Pat
 
 #[utoipa::path(
     get,
-    path = "/api/casbin/role/{role}",
-    params(("role" = String, Path, description = "角色名称")),
+    path = "/api/casbin/role/{role}/domain/{domain}",
+    params(
+        ("role" = String, Path, description = "角色名称"),
+        ("domain" = String, Path, description = "域名称"),
+    ),
     responses((status = 200, description = "成功", body = R<Vec<casbin_rule::Model>>)),
     tag = "Casbin策略"
 )]
-pub async fn get_policies_by_role(State(state): State<AppState>, Path(role): Path<String>) -> Result<impl IntoResponse, AppError> {
-    let policies = CasbinService::get_policy_by_role(&state.db, &role).await?;
+pub async fn get_policies_by_role(State(state): State<AppState>, Path((role, domain)): Path<(String, String)>) -> Result<impl IntoResponse, AppError> {
+    let policies = CasbinService::get_policy_by_role(&state.db, &role, &domain).await?;
     Ok(R::ok(policies))
 }
 
@@ -151,7 +157,7 @@ pub fn routes() -> Router<AppState> {
         .route("/api/casbin/{id}", put(update))
         .route("/api/casbin/{id}", delete_method(delete))
         .route("/api/casbin/batch", delete_method(delete_batch))
-        .route("/api/casbin/role/{role}", get(get_policies_by_role))
-        .route("/api/casbin/role/{role}", put(update_role_policies))
+        .route("/api/casbin/role/{role}/domain/{domain}", get(get_policies_by_role))
+        .route("/api/casbin/role/{role}/domain/{domain}", put(update_role_policies))
         .route("/api/casbin/user/{user}", get(get_roles_for_user))
 }
